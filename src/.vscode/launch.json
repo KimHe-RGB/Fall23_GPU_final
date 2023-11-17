@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/kimhe/Desktop/NYU Master/Fall-2023/GPU/Fall23_GPU/Final_Project/src",
+      "program": "/Users/kimhe/Desktop/NYU Master/Fall-2023/GPU/Fall23_GPU/Final_Project/src/build/Debug/outDebug"
+    }
+  ]
+}
