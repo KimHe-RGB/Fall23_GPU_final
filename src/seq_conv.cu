@@ -1,3 +1,7 @@
+/***
+ * THIS FILE IS NOT MAINTAINED ANY MORE, DONT USE IT
+*/
+
 #include <time.h>
 #include <cuda.h>
 

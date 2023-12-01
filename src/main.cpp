@@ -1,7 +1,16 @@
-#include <time.h>
-// #include <cuda.h>
-#include <iostream>
+/**
+ * @file main.cpp
+ * @author Xujin He (you@domain.com)
+ * @brief main function for solving 2D heat equation, sequential code implementation
+ * @version 0.1
+ * @date 2023-11-29
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 
+#include <time.h>
+#include <iostream>
 #include "csr.h"
 
 const double h = 0.01;

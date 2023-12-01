@@ -1,5 +1,5 @@
 #include <time.h>
-// #include <cuda.h>
+#include <cuda.h>
 #include <iostream>
 
 const double h = 0.01;

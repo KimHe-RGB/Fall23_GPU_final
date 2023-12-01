@@ -31,3 +31,7 @@
 *.exe
 *.out
 *.app
+
+CmakeCache.txt
+CmakeFiles/*
+.vscode/*

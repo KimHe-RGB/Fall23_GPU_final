@@ -1,3 +1,13 @@
+/**
+ * @file csr.h
+ * @author Xujin He (you@domain.com)
+ * @brief This header file defines CSR struct for storing the sparse matrix
+ * @version 0.1
+ * @date 2023-11-29
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #include <iostream>
 
 // i-th row length: rowInd[i+1] - rowInd[i]
@@ -5,7 +15,7 @@
 // access element ij: V[rowInd[i] + j]; j must leq rowInd[i+1]-rowInd[i]
 // it is hard to visit column wise
 
-// CSR Storage
+// struct for CSR Storage
 struct CSRMatrix {
     double* values;   // Array storing non-zero values of the matrix
     int* columns;     // Array storing column indices of non-zero values
