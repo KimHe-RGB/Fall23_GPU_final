@@ -9,33 +9,11 @@
  * 
  */
 
-#include <time.h>
-#include <iostream>
-#include "csr.h"
+#include "linalg.h"
 
 const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size
-
-/**
- * @brief forward_substitute to solve x = b \ L, L lower triangular in CSR format
- * 
- */
-// void forward_substitute(float* V, unsigned* rowInd, unsigned colInd, float* b, float* x, unsigned len);
-// {
-//     x[0] = b[0] / V[0];
-//     for (unsigned i = 0; i < len-1; i++)
-//     {
-//         float sum;
-//         int vindex = rowInd[i];
-//         for (unsigned j = vindex; j < rowInd[i+1]; j++)
-//         {
-//             int bcol = colInd[j];
-//             sum += V[vindex] * b[bcol];
-//         }
-//         x[i] = b[i] - sum / V[i][i];
-//     }
-// }
 
 int main(int argc, char const *argv[])
 {   
@@ -44,7 +22,7 @@ int main(int argc, char const *argv[])
     int DIM_Y = 3; // grid dim = n
     int DATA_SIZE = DIM_X * DIM_Y * sizeof(float);
 
-    int MATRIX_DIM = DIM_X * DIM_X * DIM_Y * DIM_Y; // A = (mn x mn), this is extremely large so 
+    int MATRIX_DIM = DIM_X * DIM_Y; // A = (mn x mn), this is extremely large so 
 
     // randomize a 2d Heat Map
     // srand(time(0));
@@ -52,18 +30,42 @@ int main(int argc, char const *argv[])
 
     // malloc CSR Matrix A in GPU
     // float* A;
-    // cudaMalloc((void **)&A, MATRIX_DIM * sizeof(float));
-    CSRMatrix A = CSRMatrix(DIM_X*DIM_Y, 5*DIM_X*DIM_Y);
-    CSRMatrix L = CSRMatrix(DIM_X*DIM_Y, 5*DIM_X*DIM_X*DIM_Y);
-    double* D;
+    // cudaMalloc((void **)&A, MATRIX_DIM^2 * sizeof(float));
+    CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_Y);
+    CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
+    double D[MATRIX_DIM];
 
     initializeCSRMatrix(A, DIM_X, DIM_Y);
+    
+    print_csr_matrix_info(A);
+    print_csr_matrix(A);
+
     ldlt_cholesky_decomposition_seq(A, L, D);
 
-    // print_csr_matrix(A);
-    // print_csr_matrix_info(A);
-
+    print_csr_matrix_info(L);
     print_csr_matrix(L);
+
+    print_diagonal(D, MATRIX_DIM);
+
+    // CSRMatrix Try = CSRMatrix(3, 6);
+    // double value[] = {1,2,3,4,5,6};
+    // int columns[] = {0,1,2,1,2,2};
+    // int row_ptr[] = {0,3,5,6};
+    // Try.values = value;
+    // Try.row_ptr = row_ptr;
+    // Try.columns = columns;
+    // Try.rows = 3;
+    // Try.non_zeros = 6;
+    // print_csr_matrix_info(Try);
+    // print_csr_matrix(Try);
+
+    // solve for Ax = b; 
+    double x[MATRIX_DIM];
+    double x_temp[MATRIX_DIM];
+    // backward_substitute(x_temp, L, x);
+    // elementwise_division_vector(D, x, MATRIX_DIM);
+    // forward_substitute(x, L, x_temp);
+
     
     return 0;
 }

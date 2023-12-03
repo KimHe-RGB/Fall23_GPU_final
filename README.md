@@ -84,3 +84,20 @@ To match boundary conditions:
   * $U_{0j}$
   * $U_{i0}$
   * $U_{mn}$, $U_{m0}$, $U_{0n}$, $U_{00}$
+
+### ldlt Cholesky Decomposition
+
+Decompose spd matrix $A$ to into a product of matrices
+
+$$
+A = LDL^T
+$$
+
+The algorithm for ldlt Cholesky Decomposition:
+
+$$
+\begin{aligned}
+D_{j} &= A_{jj} - \sum_{k=1}^{j-1} L_{jk}^2 D_k \\
+L_{ij} &= \frac1{D_j}(A_{ij} - \sum_{k=1}^{j-1} L_{ik}L_{jk} D_k) \text{, for } i > j
+\end{aligned}
+$$
