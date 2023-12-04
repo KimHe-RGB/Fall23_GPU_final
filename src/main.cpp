@@ -15,6 +15,30 @@ const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size
 
+/**
+ * @brief 
+ * 
+ */
+void Backward_Euler()
+{
+
+}
+
+/**
+ * @brief Given A = LDL', solve LDL'x = b
+ * 
+ */
+void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, int MATRIX_DIM)
+{
+    double x_temp[MATRIX_DIM];
+    forward_substitute(b, L, x_temp);
+    // print_diagonal(x_temp, MATRIX_DIM);
+    elementwise_division_vector(D, x_temp, MATRIX_DIM);
+    // print_diagonal(x_temp, MATRIX_DIM);
+    backward_substitute(x_temp, Lt, x);
+    // print_diagonal(x, MATRIX_DIM);
+}
+
 int main(int argc, char const *argv[])
 {   
     float* Data; // 2D heat map vector = (m*n)
@@ -33,39 +57,27 @@ int main(int argc, char const *argv[])
     // cudaMalloc((void **)&A, MATRIX_DIM^2 * sizeof(float));
     CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_Y);
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
+    CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
     double D[MATRIX_DIM];
 
     initializeCSRMatrix(A, DIM_X, DIM_Y);
-    
-    print_csr_matrix_info(A);
-    print_csr_matrix(A);
+    // Test: init
+    // print_csr_matrix_info(A);
+    // print_csr_matrix(A);
 
-    ldlt_cholesky_decomposition_seq(A, L, D);
+    ldlt_cholesky_decomposition_seq(A, L, Lt, D);
+    // Test: Cholesky works
+    // print_csr_matrix_info(L);
+    // print_csr_matrix(L);
+    // print_csr_matrix_info(Lt);
+    // print_csr_matrix(Lt);
+    // print_diagonal(D, MATRIX_DIM);
 
-    print_csr_matrix_info(L);
-    print_csr_matrix(L);
+    // Test: Solving Ax = b by Cholesky
+    double b[] = {0.8147, 0.9058, 0.1270, 0.9134, 0.6324, 0.0975, 0.2785, 0.5469, 0.9575};
+    double x[MATRIX_DIM]; 
 
-    print_diagonal(D, MATRIX_DIM);
-
-    // CSRMatrix Try = CSRMatrix(3, 6);
-    // double value[] = {1,2,3,4,5,6};
-    // int columns[] = {0,1,2,1,2,2};
-    // int row_ptr[] = {0,3,5,6};
-    // Try.values = value;
-    // Try.row_ptr = row_ptr;
-    // Try.columns = columns;
-    // Try.rows = 3;
-    // Try.non_zeros = 6;
-    // print_csr_matrix_info(Try);
-    // print_csr_matrix(Try);
-
-    // solve for Ax = b; 
-    double x[MATRIX_DIM];
-    double x_temp[MATRIX_DIM];
-    // backward_substitute(x_temp, L, x);
-    // elementwise_division_vector(D, x, MATRIX_DIM);
-    // forward_substitute(x, L, x_temp);
-
+    solveAxb(L, Lt, D, b, x, MATRIX_DIM);
     
     return 0;
 }

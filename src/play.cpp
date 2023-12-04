@@ -92,9 +92,7 @@ int main() {
     // Example usage
     int rows = 3;
     int non_zeros = 6;
-
     CSRMatrix A(rows, non_zeros);
-    // Initialize A matrix in CSR format (fill values, columns, and row_ptr)
     double value[] = {4,-1,-1,4,-1,-1,4};
     int columns[] = {0,1,0,1,2,1,2};
     int row_ptr[] = {0,2,5,7};
@@ -104,6 +102,7 @@ int main() {
     A.rows = 3;
     A.non_zeros = 6;
     print_csr_matrix(A);
+
 
     CSRMatrix L(rows, non_zeros);
     double* D = new double[rows];

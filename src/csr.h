@@ -68,7 +68,6 @@ struct CSRMatrix {
 
         // If the element doesn't exist, add it to the matrix
         int insertPos = end;
-        non_zeros++;
         for (int k = start; k < end; k++) {
             if (columns[k] > j) {
                 insertPos = k;
@@ -76,8 +75,8 @@ struct CSRMatrix {
             }
         }
 
-        // Shift all existing values and columns to make space for the new element
-        for (int k = row_ptr[rows - 1]; k > insertPos; --k) {
+        // Shift all existing non_zeros values and columns to make space for the new element
+        for (int k = non_zeros; k > insertPos; k--) {
             values[k] = values[k - 1];
             columns[k] = columns[k - 1];
         }
@@ -90,6 +89,7 @@ struct CSRMatrix {
         for (int k = i + 1; k <= rows; k++) {
             row_ptr[k]++;
         }
+        non_zeros++;
 
         // std::cout << i << ", " << j << " = " << values[insertPos] << std::endl;
         // std::cout << "Values: ";
