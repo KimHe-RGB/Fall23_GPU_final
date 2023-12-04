@@ -10,6 +10,7 @@
  */
 
 #include "linalg.h"
+#include "load_heat_map.h"
 
 const double h = 0.01;
 const double invhsq = 1/h/h;
@@ -21,7 +22,7 @@ const double tau = 0.01; // timestep size
  */
 void Backward_Euler()
 {
-
+// (I-ht*A) \ (u - ht*f);
 }
 
 /**
@@ -32,11 +33,8 @@ void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, int 
 {
     double x_temp[MATRIX_DIM];
     forward_substitute(b, L, x_temp);
-    // print_diagonal(x_temp, MATRIX_DIM);
     elementwise_division_vector(D, x_temp, MATRIX_DIM);
-    // print_diagonal(x_temp, MATRIX_DIM);
     backward_substitute(x_temp, Lt, x);
-    // print_diagonal(x, MATRIX_DIM);
 }
 
 int main(int argc, char const *argv[])
@@ -76,8 +74,18 @@ int main(int argc, char const *argv[])
     // Test: Solving Ax = b by Cholesky
     double b[] = {0.8147, 0.9058, 0.1270, 0.9134, 0.6324, 0.0975, 0.2785, 0.5469, 0.9575};
     double x[MATRIX_DIM]; 
-
     solveAxb(L, Lt, D, b, x, MATRIX_DIM);
+    // print_diagonal(x_temp, MATRIX_DIM);
+    // print_diagonal(x_temp, MATRIX_DIM);
+    // print_diagonal(x, MATRIX_DIM);
+
+
+    // Test: load heat map from csv:
+    // example initial condition is 76 x 76
+    double u[76*76];
+    loadCSV("../heat_map.csv", u, 76*76);
+    print_diagonal(u, 76*76);
+    writeCSV("../heat_map_out.csv", u, 76, 76);
     
     return 0;
 }
