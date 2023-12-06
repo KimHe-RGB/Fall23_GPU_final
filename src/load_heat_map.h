@@ -1,7 +1,19 @@
-
+/**
+ * @file load_heat_map.h
+ * 
+ * @author Xujin He (xh1131@nyu.edu)
+ * @brief This is sequential io code to load/write heat map into/from csv file
+ * @version 0.1
+ * @date 2023-12-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <limits>
+#include <iomanip>
 
 /**
  * @brief 
@@ -72,3 +84,10 @@ void writeCSV(const std::string& filename, double* matrix, int width, int height
     std::cout << "CSV file " << filename << " successfully written." << std::endl;
 }
 
+/**
+ * @brief render the heat map as a img
+ * 
+ */
+void snapshot(const std::string& filename, double* matrix, int width, int height) {
+    
+}

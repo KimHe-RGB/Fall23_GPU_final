@@ -132,7 +132,6 @@ void elementwise_division_vector(double* D, double* x, int dim)
  */
 void initializeCSRMatrix(CSRMatrix& A, int m, int n) {
     int matrix_size = m * n;
-    int num_elements = m * n * m * n;
 
     // Initialize CSR matrix values and structure
     int index_curr, index_next, index_prev, index_up, index_down;
