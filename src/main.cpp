@@ -55,12 +55,11 @@ void Backward_Euler(CSRMatrix A, double ht, double *f, double *u, int DIM_X, int
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
     double D[MATRIX_DIM];
     ldlt_cholesky_decomposition_seq(A_, L, Lt, D);
-    
+    // right side
+    double uf[MATRIX_DIM];
     
     while(t < endT)
     {
-        // right side
-        double uf[MATRIX_DIM];
         for (int i = 0; i < DIM_X; i++)
         {
             for (int j = 0; j < DIM_Y; j++)
