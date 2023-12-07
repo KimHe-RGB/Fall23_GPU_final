@@ -14,19 +14,62 @@
 const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size
+const double endT = 1; // end time
+
+// boundary condtions
+double a(double x)
+{
+    return 80;
+}
+double b(double y)
+{
+    return 40;
+}
+double c(double y)
+{
+    return 40;
+}
+double d(double x)
+{
+    return 80;
+}
 
 /**
  * @brief Perform one backward Euler step
  * 
  * @param A 
- * @param ht 
+ * @param ht
  * @param f 
  * @param u 
  */
-void Backward_Euler(CSRMatrix A, double ht, double *f, double *u)
+void Backward_Euler(CSRMatrix A, double ht, double *f, double *u, int DIM_X, int DIM_Y)
 {
 
-    // (I-ht*A) \ (u - ht*f);
+    // (I+ht*A) \ (u+ht*f);
+    double t = 0.0;
+    int MATRIX_DIM = DIM_X*DIM_Y;
+
+    // left side
+    CSRMatrix A_ = A; // I+ht*invhsq*A, TBA
+    CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
+    CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
+    double D[MATRIX_DIM];
+    ldlt_cholesky_decomposition_seq(A_, L, Lt, D);
+    // right side
+    double uf[MATRIX_DIM];
+    
+    while(t < endT)
+    {
+        for (int i = 0; i < DIM_X; i++)
+        {
+            for (int j = 0; j < DIM_Y; j++)
+            {
+                uf[i*DIM_Y+j] = u[i*DIM_Y+j] + ht*invhsq*f[i*DIM_Y+j];
+            }
+        }
+        solveAxb(L, Lt, D, uf, u, u, MATRIX_DIM);
+        t += ht;
+    }
 }
 
 /**
@@ -48,24 +91,25 @@ void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, doub
  */
 void computeBoundaryCondition(double* f, double *u, const int m, const int n)
 {
-    f[0] = 0; // TL corner
-    f[n-1] = 0; // TR corner
-    f[(m-1)*n] = 0; // BL corner
-    f[m*n-1] = 0; // BR corner
+    f[0] = a(h) + b(h); // TL corner
+    f[n-1] = b(n*h) + d(h); // TR corner
+    f[(m-1)*n] = a(m*h) + c(h); // BL corner
+    f[m*n-1] = c(m*h) + d(n*h); // BR corner
     // boundary condition on top row, except the 1st and nth col
     for (int i = 1; i < n-1; i++)
     {
-
+        f[i] = b(h*(i+1));
     }
     // boundary condition on left and right col, except 1st and last row
     for (int i = n; i < (m-1)*n; i+=n)
     {
-
+        f[i] = a(h*i/n);
+        f[i+n-1] = d(h*i/n);
     }
     // boundary condition on bottom row, except the 1st and nth col
     for (int i = (m-1)*n + 1; i < m*n - 1; i++)
     {
-
+        f[i] = c(h*(i-(m-1)*n));
     }
 }
 
