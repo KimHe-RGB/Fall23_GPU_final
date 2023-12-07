@@ -186,3 +186,69 @@ void initializeCSRMatrix(CSRMatrix& A, int m, int n) {
         A.row_ptr[i + 1] = current_element;
     }
 }
+
+
+/**
+ * @brief This initialize the 5-point laplacian matrix in CSR Format for Backward Euler method, I+ht*invhsq*A
+ * 
+ * @param A 
+ * @param m dimension X
+ * @param n dimension Y
+ * @param htinvhsq ht * invhsq
+ */
+void initBackwardEulerMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
+    int matrix_size = m * n;
+
+    // Initialize CSR matrix values and structure
+    int index_curr, index_next, index_prev, index_up, index_down;
+    int current_element = 0;
+
+    for (int i = 0; i < matrix_size; ++i) {
+        index_curr = i * matrix_size + i;
+
+        // A_{i-1,j}
+        index_up = index_curr - n;
+        if (index_up >= i * matrix_size) {
+            A.values[current_element] = -htinvhsq;
+            A.columns[current_element] = i - n;
+            A.non_zeros++;
+            current_element++;
+        }
+
+        // A_{i,j-1}
+        index_prev = index_curr - 1;
+        if (index_prev >= i * matrix_size) {
+            A.values[current_element] = -htinvhsq;
+            A.columns[current_element] = i - 1;
+            A.non_zeros++;
+            current_element++;
+        }
+
+        // A_{i,j}
+        A.values[current_element] = 1 + 4.0*htinvhsq;
+        A.columns[current_element] = i;
+        A.non_zeros++;
+        current_element++;
+
+        // A_{i,j+1}
+        index_next = index_curr + 1;
+        if (index_next < (i + 1) * matrix_size) {
+            A.values[current_element] = -htinvhsq;
+            A.columns[current_element] = i + 1;
+            A.non_zeros++;
+            current_element++;
+        }
+        
+        // A_{i+1,j}
+        index_down = index_curr + n;
+        if (index_down < (i + 1) * matrix_size) {
+            A.values[current_element] = -htinvhsq;
+            A.columns[current_element] = i + n;
+            A.non_zeros++;
+            current_element++;
+        }
+
+        // March the row pointer by 1
+        A.row_ptr[i + 1] = current_element;
+    }
+}

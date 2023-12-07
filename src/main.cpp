@@ -13,50 +13,57 @@
 
 const double h = 0.01;
 const double invhsq = 1/h/h;
-const double tau = 0.01; // timestep size
+const double tau = 0.01; // timestep size ht
 const double endT = 1; // end time
 
-// boundary condtions
+// boundary condtions on top
 double a(double x)
 {
     return 80;
 }
+// boundary condtions on left
 double b(double y)
 {
     return 40;
 }
+// boundary condtions on bottom
 double c(double y)
 {
     return 40;
 }
+// boundary conditions on right
 double d(double x)
 {
     return 80;
 }
 
 /**
- * @brief Perform one backward Euler step
+ * @brief Use Backward Euler method to solve heat equation
+ * For each time step, we solve the linear system (I+ht*A) \ (u+ht*f);
  * 
- * @param A 
- * @param ht
  * @param f 
  * @param u 
+ * @param D 
+ * @param uf 
+ * @param DIM_X 
+ * @param DIM_Y 
  */
-void Backward_Euler(CSRMatrix A, double ht, double *f, double *u, int DIM_X, int DIM_Y)
+void Backward_Euler(double *f, double *u, double* D, double* uf, const int DIM_X, const int DIM_Y)
 {
-
     // (I+ht*A) \ (u+ht*f);
     double t = 0.0;
-    int MATRIX_DIM = DIM_X*DIM_Y;
+    const int MATRIX_DIM = DIM_X*DIM_Y;
 
     // left side
-    CSRMatrix A_ = A; // I+ht*invhsq*A, TBA
+    CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_Y);
+    initBackwardEulerMatrix(A, tau*invhsq, DIM_X, DIM_Y); // initialize I+ht*invhsq*A
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
-    double D[MATRIX_DIM];
-    ldlt_cholesky_decomposition_seq(A_, L, Lt, D);
+    // double D[MATRIX_DIM];
+    ldlt_cholesky_decomposition_seq(A, L, Lt, D);
     // right side
-    double uf[MATRIX_DIM];
+    // double uf[MATRIX_DIM];
+    double* u_temp;
     
     while(t < endT)
     {
@@ -64,11 +71,11 @@ void Backward_Euler(CSRMatrix A, double ht, double *f, double *u, int DIM_X, int
         {
             for (int j = 0; j < DIM_Y; j++)
             {
-                uf[i*DIM_Y+j] = u[i*DIM_Y+j] + ht*invhsq*f[i*DIM_Y+j];
+                uf[i*DIM_Y+j] = u[i*DIM_Y+j] + tau*invhsq*f[i*DIM_Y+j];
             }
         }
-        solveAxb(L, Lt, D, uf, u, u, MATRIX_DIM);
-        t += ht;
+        solveAxb(L, Lt, D, uf, u, u_temp, MATRIX_DIM);
+        t += tau;
     }
 }
 
@@ -84,7 +91,7 @@ void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, doub
 }
 
 /**
- * @brief Compute the boundary condition term, here we assume boundary condition to be constant 0 all the time
+ * @brief Compute the boundary condition term for the RHS, here we assume boundary condition to be constant 0 all the time
  * 
  * @param f the boundary condition 
  * @param m 
@@ -122,13 +129,7 @@ int main(int argc, char const *argv[])
 
     const int MATRIX_DIM = DIM_X * DIM_Y; // A = (mn x mn), this is extremely large
 
-    // randomize a 2d Heat Map
-    // srand(time(0));
-    // for (i = 0; i < DIM_X*DIM_Y; i++) Data[i] = rand();
-
-    // malloc CSR Matrix A in GPU
-    // float* A;
-    // cudaMalloc((void **)&A, MATRIX_DIM^2 * sizeof(float));
+    // malloc CSR Matrix A in CPU
     CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_Y);
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*DIM_X*DIM_X*DIM_Y);
@@ -150,11 +151,11 @@ int main(int argc, char const *argv[])
     // Test: Solving Ax = b by Cholesky
     double b[] = {0.8147, 0.9058, 0.1270, 0.9134, 0.6324, 0.0975, 0.2785, 0.5469, 0.9575};
     double x[MATRIX_DIM]; 
-    double x_temp[MATRIX_DIM];
+    double *x_temp;
     solveAxb(L, Lt, D, b, x, x_temp, MATRIX_DIM);
-    // print_diagonal(x_temp, MATRIX_DIM);
-    // print_diagonal(x_temp, MATRIX_DIM);
-    // print_diagonal(x, MATRIX_DIM);
+    print_diagonal(x_temp, MATRIX_DIM);
+    print_diagonal(x_temp, MATRIX_DIM);
+    print_diagonal(x, MATRIX_DIM);
 
 
     // Test: load heat map from csv:
@@ -169,6 +170,6 @@ int main(int argc, char const *argv[])
     double f[76];
     computeBoundaryCondition(f, u, DIM_X, DIM_Y);
     // Backward Euler steps
-    Backward_Euler(A, tau, f, u);
+    // Backward_Euler(A, tau, f, u, 76, 76);
     return 0;
 }
