@@ -70,6 +70,8 @@
         "random": "cpp",
         "utility": "cpp",
         "deque": "cpp",
-        "__memory": "cpp"
+        "__memory": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }

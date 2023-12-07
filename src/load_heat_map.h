@@ -53,6 +53,7 @@ void loadCSV(const std::string& filename, double* heat, int dim) {
         }
     }
     file.close();
+    std::cout << "CSV file " << filename << " successfully loaded." << std::endl;
     return;
 }
 
@@ -68,7 +69,7 @@ void writeCSV(const std::string& filename, double* matrix, int width, int height
     }
     // Set the precision of the output stream to maximum float precision
     file << std::setprecision(std::numeric_limits<double>::max_digits10);
-    
+
     for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
             file << matrix[i * width + j];

@@ -8,6 +8,8 @@
  * @copyright Copyright (c) 2023
  * 
  */
+#ifndef __CSR_H
+#define __CSR_H
 #include <iostream>
 
 // i-th row length: rowInd[i+1] - rowInd[i]
@@ -44,11 +46,9 @@ struct CSRMatrix {
         for (int p = row_ptr[i]; p < row_ptr[i + 1]; ++p) {
             if (columns[p] == j) {
                 return values[p];
-            } else if (columns[p] > j) {
-                // Column not found, as columns are in ascending order
-                break;  
             }
         }
+        // Column not found, as columns are in ascending order
         return 0;
     }
 
@@ -66,7 +66,9 @@ struct CSRMatrix {
             }
         }
 
+        // for large matrix, this branch is the most time-consuming step so we need to avoid
         // If the element doesn't exist, add it to the matrix
+        std::cout << "Bad Branch: undesired insertion at " << i << ", " << j << std::endl;
         int insertPos = end;
         for (int k = start; k < end; k++) {
             if (columns[k] > j) {
@@ -124,3 +126,5 @@ struct CSCMatrix {
         delete[] col_ptr;
     }
 };
+
+#endif

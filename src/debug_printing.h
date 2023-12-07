@@ -1,5 +1,10 @@
-#include <iostream>
+#ifndef __CSR_H
 #include "csr.h"
+#endif
+
+#ifndef __DEBUG_PRINT_H
+#define __DEBUG_PRINT_H
+#include <iostream>
 
 /**
  * @brief Print out a CSRMatrix as a full matrix
@@ -68,3 +73,4 @@ void print_csr_matrix_info(const CSRMatrix& A) {
     std::cout << "non-zeros: " << A.non_zeros << std::endl;
     std::cout << "capacity: " << A.capacity << std::endl;
 }
+#endif
