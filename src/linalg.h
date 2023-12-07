@@ -73,7 +73,8 @@ void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, 
     }
     Lt.non_zeros = count;
 
-    // LDL Cholesky Decomposition    
+    std::cout << "total rows: " << A.rows << std::endl;
+    // LDL Cholesky Decomposition: we know L non-zero term position now   
     for (int j = 0; j < A.rows; j++) {
         double sumL = 0.0;
         // Calculate the diagonal element of L and update D
@@ -86,13 +87,15 @@ void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, 
         Lt.set_ij(j,j,1);
         // std::cout << j << " : " << D[j] << " - " << sumL << std::endl;
 
-        // Calculate the off-diagonal elements of L on Row i, for i > j
-        for (int i = j+1; i < L.rows; i++) {
+        // Calculate the off-diagonal elements of L on Row i, for all i > j, there are at most n+1 rows to update
+        for (int i = j+1; i < j+n+1; i++) {
             double sumL2 = 0.0; 
 
             double Aij = A.get_ij(i, j);
-            // sum up previous L values, find whether Lik or Ljk is zero or non-zero
-            for (int k = 0; k < j; k++)
+            // sum up previous L values, find whether Lik or Ljk is zero or non-zero, there are at most n+1 non zero elements
+            // TBD: unroll first n loops
+            int st = std::max(0, j-n);
+            for (int k = st; k < j; k++)
             {
                 // \sum_{k=1}^{j-1} L_{ik}*L_{jk}*D_{k}
                 sumL2 += L.get_ij(i,k) * L.get_ij(j,k) * D[k];
@@ -104,6 +107,7 @@ void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, 
                 Lt.set_ij(j,i,Lij);
             }
         }
+        // finished row
     }
 
     // std::cout << "Values of L: ";

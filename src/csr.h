@@ -43,9 +43,11 @@ struct CSRMatrix {
 
     double get_ij(int i, int j) const 
     {
-        for (int p = row_ptr[i]; p < row_ptr[i + 1]; ++p) {
-            if (columns[p] == j) {
-                return values[p];
+        int start = row_ptr[i];
+        int end = row_ptr[i + 1];
+        for (int k = start; k < end; k++) {
+            if (columns[k] == j) {
+                return values[k];
             }
         }
         // Column not found, as columns are in ascending order
@@ -54,10 +56,8 @@ struct CSRMatrix {
 
     void set_ij(int i, int j, double value) 
     {
-        // Find the range of non-zero elements in the row
         int start = row_ptr[i];
         int end = row_ptr[i + 1];
-
         // Check if the element already exists in the matrix
         for (int k = start; k < end; k++) {
             if (columns[k] == j) {
@@ -65,33 +65,36 @@ struct CSRMatrix {
                 return;
             }
         }
+        return;
 
-        // for large matrix, this branch is the most time-consuming step so we need to avoid
-        // If the element doesn't exist, add it to the matrix
-        std::cout << "Bad Branch: undesired insertion at " << i << ", " << j << std::endl;
-        int insertPos = end;
-        for (int k = start; k < end; k++) {
-            if (columns[k] > j) {
-                insertPos = k;
-                break;
-            }
-        }
+        // // for large matrix, this branch is the most time-consuming step so we need to avoid, 
+        // // we initialize L so that this branch is avoided
+        //
+        // // If the element doesn't exist, add it to the matrix
+        // std::cout << "Bad Branch: undesired insertion at " << i << ", " << j << std::endl;
+        // int insertPos = end;
+        // for (int k = start; k < end; k++) {
+        //     if (columns[k] > j) {
+        //         insertPos = k;
+        //         break;
+        //     }
+        // }
 
-        // Shift all existing non_zeros values and columns to make space for the new element
-        for (int k = non_zeros; k > insertPos; k--) {
-            values[k] = values[k - 1];
-            columns[k] = columns[k - 1];
-        }
+        // // Shift all existing non_zeros values and columns to make space for the new element
+        // for (int k = non_zeros; k > insertPos; k--) {
+        //     values[k] = values[k - 1];
+        //     columns[k] = columns[k - 1];
+        // }
 
-        // Insert the new element
-        values[insertPos] = value;
-        columns[insertPos] = j;
+        // // Insert the new element
+        // values[insertPos] = value;
+        // columns[insertPos] = j;
 
-        // Update row pointers after insertion
-        for (int k = i + 1; k <= rows; k++) {
-            row_ptr[k]++;
-        }
-        non_zeros++;
+        // // Update row pointers after insertion
+        // for (int k = i + 1; k <= rows; k++) {
+        //     row_ptr[k]++;
+        // }
+        // non_zeros++;
 
         // std::cout << i << ", " << j << " = " << values[insertPos] << std::endl;
         // std::cout << "Values: ";
