@@ -34,40 +34,6 @@ double d(double x)
     return 80;
 }
 
-
-// fu = U + ht*f(U)
-void U_fU(double* fu, double *u, int m, int n, double ht)
-{
-    // line 1
-    for (int j = 1; j <= n; j++)
-    {
-        fu[j-1] = b(h*j);
-    }
-    fu[0] += a(h);
-    fu[n-1] += d(h);
-    // 2 to m-1
-    for (int i = 2; i <= m-1; i++)
-    {
-        fu[(i-1)*n] = a(h*i);
-        fu[i*n-1] = d(i*h);
-    }
-    // line m
-    for (int j = 1; j <= n; j++)
-    {
-        fu[(m-1)*n+j-1] = c(h*j);
-    }
-    fu[(m-1)*n] += a(m*h);
-    fu[m*n-1] += d(m*h);
-
-    for (int i = 0; i < m; i++)
-    {
-        for (int j = 0; j < n; j++)
-        {
-            fu[i*n+j] = u[i*n+j] + ht*fu[i*n+j];
-        }
-    }
-}
-
 /**
  * @brief Perform one backward Euler step
  * 
