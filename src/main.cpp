@@ -60,9 +60,9 @@ int main(int argc, char const *argv[])
     // initialize boundary condition correction term
     double f[dim*dim];
     // Backward Euler steps
-    print_diagonal(u, dim*dim);
+    print_heat_map(u, dim, dim);
     // Backward_Euler_CSR(f, u, d, temp_vec, dim, dim);
-    print_diagonal(u, dim*dim);
+    print_heat_map(u, dim, dim);
 
     // writeCSV("../heat_map_out.csv", u, dim, dim);
     return 0;

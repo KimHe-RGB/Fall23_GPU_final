@@ -73,4 +73,25 @@ void print_csr_matrix_info(const CSRMatrix& A) {
     std::cout << "non-zeros: " << A.non_zeros << std::endl;
     std::cout << "capacity: " << A.capacity << std::endl;
 }
+
+
+/**
+ * @brief print out 2d heat map
+ * 
+ * @param heat 
+ * @param m 
+ * @param n 
+ */
+void print_heat_map(double* heat, int m, int n) {
+    for (int i = 0; i < m; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            std::cout << heat[i*n + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
 #endif
