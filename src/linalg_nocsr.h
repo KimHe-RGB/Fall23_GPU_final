@@ -1,3 +1,15 @@
+/**
+ * @file linalg_nocsr.h
+ * @author Xujin He xh1131@nyu.edu
+ * @brief This implement backward euler method without using CSR Array, 
+ * This header file is not used in the current version
+ * 
+ * @version 0.1
+ * @date 2023-12-07
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #include <iostream>
 
 #ifndef __GLOBAL_H

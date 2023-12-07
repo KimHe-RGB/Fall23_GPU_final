@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2023
  */
 
-// #include "global.h"
+#include "global.h"
 #include "linalg.h"
 #include "load_heat_map.h"
 

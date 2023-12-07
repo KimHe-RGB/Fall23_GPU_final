@@ -9,6 +9,9 @@
  * @copyright Copyright (c) 2023
  * 
  */
+#ifndef __LOAD_HEAT_MAP
+#define __LOAD_HEAT_MAP
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -92,3 +95,5 @@ void writeCSV(const std::string& filename, double* matrix, int width, int height
 void snapshot(const std::string& filename, double* matrix, int width, int height) {
     
 }
+
+#endif
