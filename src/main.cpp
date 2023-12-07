@@ -56,17 +56,18 @@ void Backward_Euler(CSRMatrix A, double ht, double *f, double *u, int DIM_X, int
     double D[MATRIX_DIM];
     ldlt_cholesky_decomposition_seq(A_, L, Lt, D);
     
-    // right side
-    double uf[MATRIX_DIM];
-    for (int i = 0; i < DIM_X; i++)
-    {
-        for (int j = 0; j < DIM_Y; j++)
-        {
-            uf[i*DIM_Y+j] = u[i*DIM_Y+j] + ht*invhsq*f[i*DIM_Y+j];
-        }
-    }
+    
     while(t < endT)
     {
+        // right side
+        double uf[MATRIX_DIM];
+        for (int i = 0; i < DIM_X; i++)
+        {
+            for (int j = 0; j < DIM_Y; j++)
+            {
+                uf[i*DIM_Y+j] = u[i*DIM_Y+j] + ht*invhsq*f[i*DIM_Y+j];
+            }
+        }
         solveAxb(L, Lt, D, uf, u, u, MATRIX_DIM);
         t += ht;
     }
