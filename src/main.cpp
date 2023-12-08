@@ -51,19 +51,22 @@ int main(int argc, char const *argv[])
 
     // Test: load heat map from csv:
     // example initial condition is 76 x 76
-    const int dim = 8;
-    double u[] = {0.8147, 0.9058, 0.1270, 0.9134, 0.6324, 0.0975, 0.2785, 0.5469, 0.9575, 0.9649, 0.1576, 0.9706, 0.9572, 0.4854, 0.8003, 0.1419, 0.4218, 0.9157, 0.7922, 0.9595, 0.6557, 0.0357, 0.8491, 0.9340, 0.6787, 0.7577, 0.7431, 0.3922, 0.6555, 0.1712, 0.7060, 0.0318, 0.2769, 0.0462, 0.0971, 0.8235, 0.6948, 0.3171, 0.9502, 0.0344, 0.4387, 0.3816, 0.7655, 0.7952, 0.1869, 0.4898, 0.4456, 0.6463, 0.7094, 0.7547, 0.2760, 0.6797, 0.6551, 0.1626, 0.1190, 0.4984, 0.9597, 0.3404, 0.5853, 0.2238, 0.7513, 0.2551, 0.5060, 0.6991};
-    // double *u = (double *) malloc(dim*dim*sizeof(double));
-    // loadCSV("../heat_map.csv", u, dim*dim);
+    // const int dim = 8;
+    // double u[] = {0.8147, 0.9058, 0.1270, 0.9134, 0.6324, 0.0975, 0.2785, 0.5469, 0.9575, 0.9649, 0.1576, 0.9706, 0.9572, 0.4854, 0.8003, 0.1419, 0.4218, 0.9157, 0.7922, 0.9595, 0.6557, 0.0357, 0.8491, 0.9340, 0.6787, 0.7577, 0.7431, 0.3922, 0.6555, 0.1712, 0.7060, 0.0318, 0.2769, 0.0462, 0.0971, 0.8235, 0.6948, 0.3171, 0.9502, 0.0344, 0.4387, 0.3816, 0.7655, 0.7952, 0.1869, 0.4898, 0.4456, 0.6463, 0.7094, 0.7547, 0.2760, 0.6797, 0.6551, 0.1626, 0.1190, 0.4984, 0.9597, 0.3404, 0.5853, 0.2238, 0.7513, 0.2551, 0.5060, 0.6991};
+    const int dim = 76;
+    double *u = (double *) malloc(dim*dim*sizeof(double));
+    loadCSV("../heat_map.csv", u, dim*dim);
     double *d = (double *) malloc(dim*dim*sizeof(double));
     double *temp_vec = (double *) malloc(dim*dim*sizeof(double));
     
     // initialize boundary condition correction term
     double f[dim*dim];
     // Backward Euler steps
-    print_heat_map(u, dim, dim);
-    Backward_Euler_CSR(f, u, d, temp_vec, dim, dim);
-    print_heat_map(u, dim, dim);
+    // print_heat_map(u, dim, dim);
+    // Backward_Euler_CSR(f, u, d, temp_vec, dim, dim);
+    // print_heat_map(u, dim, dim);
+    
+    snapshot("../outcome.gif", u, dim, dim);
 
     // writeCSV("../heat_map_out.csv", u, dim, dim);
     return 0;

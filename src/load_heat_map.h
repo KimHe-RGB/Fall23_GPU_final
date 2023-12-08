@@ -17,6 +17,7 @@
 #include <sstream>
 #include <limits>
 #include <iomanip>
+#include "../ext/gif-h/gif.h"
 
 /**
  * @brief 
@@ -88,12 +89,36 @@ void writeCSV(const std::string& filename, double* matrix, int width, int height
     std::cout << "CSV file " << filename << " successfully written." << std::endl;
 }
 
+void convertDoubleArray(double* input, const size_t size, const uint8_t*& output) {
+    // Allocate memory for the uint8_t array, including rgba format
+    uint8_t* uint8Array = new uint8_t[size*4];
+
+    // Convert and scale each element from double to uint8_t, use simple interpolation for color
+    for (size_t i = 0; i < size; i++) {
+        uint8Array[i*4] = static_cast<uint8_t>((1-input[i]) * 255.0 / 160.0);
+        uint8Array[i*4+1] = 0; // no green 
+        uint8Array[i*4+2] = static_cast<uint8_t>(input[i] * 255.0 / 160.0);
+        uint8Array[i*4+3] = 1;
+    }
+
+    // Set the output pointer
+    output = uint8Array;
+}
+
 /**
  * @brief render the heat map as a img
  * 
  */
-void snapshot(const std::string& filename, double* matrix, int width, int height) {
-    
+void snapshot(const char *filename, double* matrix, int width, int height) {
+    int delay = 25;
+    GifWriter g;
+    const uint8_t * image;
+    convertDoubleArray(matrix, width*height, image);
+    GifBegin(&g, filename, width, height, delay);
+    for (int i=0; i<1; i += 1)
+	{
+        GifWriteFrame(&g, image, width, height, delay);
+    }
+    std::cout << "finished writing gif" << std::endl;
 }
-
 #endif
