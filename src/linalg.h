@@ -176,8 +176,9 @@ void elementwise_division_vector(double* D, double* x, int dim)
  * @brief Given A = LDL', solve LDL'x = b
  * 
  */
-void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, double *x_temp,  const int MATRIX_DIM)
+void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, const int MATRIX_DIM)
 {
+    double x_temp[MATRIX_DIM];
     forward_substitute(b, L, x_temp);
     elementwise_division_vector(D, x_temp, MATRIX_DIM);
     backward_substitute(x_temp, Lt, x);
@@ -277,7 +278,7 @@ void initBackwardEulerCSRMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
 
         // A_{i,j-1}
         index_prev = index_curr - 1;
-        if (index_prev >= i * matrix_size) {
+        if (index_prev >= i * matrix_size && i%n != 0) {
             A.values[current_element] = -htinvhsq;
             A.columns[current_element] = i - 1;
             A.non_zeros++;
@@ -292,7 +293,7 @@ void initBackwardEulerCSRMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
 
         // A_{i,j+1}
         index_next = index_curr + 1;
-        if (index_next < (i + 1) * matrix_size) {
+        if (index_next < (i + 1) * matrix_size && (i+1)%n != 0) {
             A.values[current_element] = -htinvhsq;
             A.columns[current_element] = i + 1;
             A.non_zeros++;
@@ -321,11 +322,10 @@ void initBackwardEulerCSRMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
  * @param f boudary correction term
  * @param u the heat map being updated
  * @param D space for the diagonal matrix
- * @param uf 
  * @param m 
  * @param n 
  */
-void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m, const int n)
+void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int n)
 {
     // u_{k+1} = (I + ht*invhsq*A) \ (u_k + ht*invhsq*f);
     double t = 0.0;
@@ -336,12 +336,14 @@ void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m
     std::cout << "init kernel" << std::endl;
     CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*m*n);
     initBackwardEulerCSRMatrix(A, tau*invhsq, m, n); // initialize I + ht*invhsq*A
+    print_csr_matrix(A);
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     std::cout << "start cholesky" << std::endl;
     ldlt_cholesky_decomposition_seq(A, L, Lt, D, m, n);
+    print_diagonal(D, MATRIX_DIM);
     // right side
-    double u_temp[MATRIX_DIM];
+    double b[MATRIX_DIM];
     
     std::cout << "start running euler steps" << std::endl;
     
@@ -353,18 +355,15 @@ void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m
         {
             for (int j = 0; j < n; j++)
             {
-                uf[i*n+j] = u[i*n+j] + tau*invhsq*f[i*n+j];
+                b[i*n+j] = u[i*n+j] + tau*invhsq*f[i*n+j];
             }
         }
-        solveAxb(L, Lt, D, uf, u, u_temp, MATRIX_DIM);
-        double* temp = uf;
-        uf = u;
-        u = temp;
-        t += tau;
+        // std::cout << "b: \n";
+        // print_heat_map(b, m, n);
+        solveAxb(L, Lt, D, b, u, MATRIX_DIM);
+        // std::cout << "u: \n";
+        // print_heat_map(u, m, n);
     }
-    double* temp = uf;
-    uf = u;
-    u = temp;
 }
 
 #endif

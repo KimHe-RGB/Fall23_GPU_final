@@ -72,6 +72,10 @@
         "deque": "cpp",
         "__memory": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "numeric": "cpp",
+        "fstream": "cpp",
+        "iomanip": "cpp",
+        "numbers": "cpp"
     }
 }
