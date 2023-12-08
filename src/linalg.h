@@ -108,19 +108,8 @@ void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, 
             }
         }
         // finished row
+        // std::cout << "finished col: " << j << std::endl;
     }
-
-    // std::cout << "Values of L: ";
-    // for (int i = 0; i < L.non_zeros; ++i) {
-    //     std::cout << L.values[i] << " ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "Values of Lt: ";
-    // for (int i = 0; i < Lt.non_zeros; ++i) {
-    //     std::cout << Lt.values[i] << " ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << std::endl;
 }
 
 
@@ -342,13 +331,11 @@ void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m
     double t = 0.0;
     const int MATRIX_DIM = m*n;
 
-    std::cout << "compute bdry" << std::endl;
     computeBoundaryCondition(f, u, m, n);
     // left side
     std::cout << "init kernel" << std::endl;
     CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*m*n);
     initBackwardEulerCSRMatrix(A, tau*invhsq, m, n); // initialize I + ht*invhsq*A
-
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     std::cout << "start cholesky" << std::endl;
@@ -357,7 +344,10 @@ void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m
     double u_temp[MATRIX_DIM];
     
     std::cout << "start running euler steps" << std::endl;
-    while(t < endT)
+    
+    int total_steps = endT / tau;
+
+    for (int p = 0; p < total_steps; p++)
     {
         for (int i = 0; i < m; i++)
         {
@@ -367,8 +357,14 @@ void Backward_Euler_CSR(double *f, double *u, double* D, double* uf, const int m
             }
         }
         solveAxb(L, Lt, D, uf, u, u_temp, MATRIX_DIM);
+        double* temp = uf;
+        uf = u;
+        u = temp;
         t += tau;
     }
+    double* temp = uf;
+    uf = u;
+    u = temp;
 }
 
 #endif

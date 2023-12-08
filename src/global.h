@@ -3,27 +3,27 @@
 const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size ht
-const double endT = 1; // end time
+const double endT = 0.00; // end time
 
 // boundary condtions on top
 double a(double x)
 {
-    return 80;
+    return 2;
 }
 // boundary condtions on left
 double b(double y)
 {
-    return 40;
+    return 3;
 }
 // boundary condtions on bottom
 double c(double y)
 {
-    return 40;
+    return 4;
 }
 // boundary conditions on right
 double d(double x)
 {
-    return 80;
+    return 5;
 }
 
 /**
@@ -34,6 +34,10 @@ double d(double x)
  */
 void computeBoundaryCondition(double* f, double *u, const int m, const int n)
 {
+    for (int i = 0; i < m*n; i++)
+    {
+        f[i] = 0;
+    }
     f[0] = a(h) + b(h); // TL corner
     f[n-1] = b(n*h) + d(h); // TR corner
     f[(m-1)*n] = a(m*h) + c(h); // BL corner
