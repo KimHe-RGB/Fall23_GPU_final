@@ -109,14 +109,14 @@ void convertDoubleArray(double* input, const size_t size, const uint8_t*& output
  * @brief render the heat map as a img
  * 
  */
-void snapshot(const char *filename, double* matrix, int width, int height) {
+void snapshot(const char *filename, double* matrix, int width, int height, int timesteps) {
     int delay = 25;
     GifWriter g;
     const uint8_t * image;
-    convertDoubleArray(matrix, width*height, image);
     GifBegin(&g, filename, width, height, delay);
-    for (int i=0; i<1; i += 1)
+    for (int i=0; i<timesteps; i += 1)
 	{
+        convertDoubleArray(matrix, width*height, image);
         GifWriteFrame(&g, image, width, height, delay);
     }
     std::cout << "finished writing gif" << std::endl;

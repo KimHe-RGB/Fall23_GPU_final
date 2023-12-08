@@ -60,8 +60,8 @@ int main(int argc, char const *argv[])
     //                 0.4387, 0.3816, 0.7655, 0.7952, 0.1869, 0.4898, 0.4456, 0.6463, 
     //                 0.7094, 0.7547, 0.2760, 0.6797, 0.6551, 0.1626, 0.1190, 0.4984, 
     //                 0.9597, 0.3404, 0.5853, 0.2238, 0.7513, 0.2551, 0.5060, 0.6991};
-    double u[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-    const int dim = 3;
+    double u[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const int dim = 4;
     //double *u = (double *) malloc(dim*dim*sizeof(double));
     //loadCSV("../heat_map.csv", u, dim*dim);
     double *d = (double *) malloc(dim*dim*sizeof(double));
@@ -74,7 +74,8 @@ int main(int argc, char const *argv[])
     Backward_Euler_CSR(f, u, d, dim, dim);
     print_heat_map(u, dim, dim);
     
-    //snapshot("../outcome.gif", u, dim, dim);
+    
+    // snapshot("../outcome.gif", u, dim, dim, endT/tau);
 
     // writeCSV("../heat_map_out.csv", u, dim, dim);
     return 0;

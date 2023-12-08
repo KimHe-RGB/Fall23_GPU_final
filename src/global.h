@@ -18,12 +18,12 @@ double b(double y)
 // boundary condtions on bottom
 double c(double y)
 {
-    return 3;
+    return 10;
 }
 // boundary conditions on right
 double d(double x)
 {
-    return 3;
+    return 10;
 }
 
 /**

@@ -1,7 +1,7 @@
-m = 4;
-n = 4;
+m = 8;
+n = 8;
 
-h = 0.1;
+h = 0.01;
 tau = 0.01;
 
 % A: left side matrix 
@@ -36,7 +36,7 @@ for i = 1:m
         end
     end
 end
-
+A
 % init
 u = zeros(m*n, 1);
 % backward euler
@@ -46,7 +46,7 @@ for i = 1:10
     br = u + th*f;
     u = A\br;
 end
-u
+reshape(u, [m, n])
 
 
 % boundary terms
@@ -83,9 +83,9 @@ function y = b(x)
 end
 % bottom
 function y = c(x)
-    y = 3;
+    y = 10;
 end
 % right
 function y = d(x)
-    y = 3;
+    y = 10;
 end

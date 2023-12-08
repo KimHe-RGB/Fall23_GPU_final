@@ -178,10 +178,11 @@ void elementwise_division_vector(double* D, double* x, int dim)
  */
 void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, const int MATRIX_DIM)
 {
-    double x_temp[MATRIX_DIM];
+    double *x_temp = (double *) malloc(MATRIX_DIM*sizeof(double));
     forward_substitute(b, L, x_temp);
     elementwise_division_vector(D, x_temp, MATRIX_DIM);
     backward_substitute(x_temp, Lt, x);
+    free(x_temp);
 }
 
 /**
@@ -336,15 +337,14 @@ void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int 
     std::cout << "init kernel" << std::endl;
     CSRMatrix A = CSRMatrix(MATRIX_DIM, 5*m*n);
     initBackwardEulerCSRMatrix(A, tau*invhsq, m, n); // initialize I + ht*invhsq*A
-    print_csr_matrix(A);
+    // print_csr_matrix(A);
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     std::cout << "start cholesky" << std::endl;
     ldlt_cholesky_decomposition_seq(A, L, Lt, D, m, n);
-    print_diagonal(D, MATRIX_DIM);
+    // print_diagonal(D, MATRIX_DIM);
     // right side
-    double b[MATRIX_DIM];
-    
+    double *b = (double *) malloc(MATRIX_DIM*MATRIX_DIM*sizeof(double));
     std::cout << "start running euler steps" << std::endl;
     
     int total_steps = endT / tau;
@@ -364,6 +364,7 @@ void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int 
         // std::cout << "u: \n";
         // print_heat_map(u, m, n);
     }
+    free(b);
 }
 
 #endif
