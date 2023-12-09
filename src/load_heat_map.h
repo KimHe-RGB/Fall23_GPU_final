@@ -95,9 +95,9 @@ void convertDoubleArray(double* input, const size_t size, const uint8_t*& output
 
     // Convert and scale each element from double to uint8_t, use simple interpolation for color
     for (size_t i = 0; i < size; i++) {
-        uint8Array[i*4] = static_cast<uint8_t>((1-input[i]) * 255.0 / 160.0);
+        uint8Array[i*4] = static_cast<uint8_t>((input[i]) * 255.0 / 10.0);
         uint8Array[i*4+1] = 0; // no green 
-        uint8Array[i*4+2] = static_cast<uint8_t>(input[i] * 255.0 / 160.0);
+        uint8Array[i*4+2] = static_cast<uint8_t>((1-input[i]) * 255.0 / 10.0);
         uint8Array[i*4+3] = 1;
     }
 

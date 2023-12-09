@@ -18,7 +18,7 @@ double b(double y)
 // boundary condtions on bottom
 double c(double y)
 {
-    return 10;
+    return 3;
 }
 // boundary conditions on right
 double d(double x)
