@@ -1,9 +1,9 @@
 #ifndef __GLOBAL_H
 #define __GLOBAL_H
-const double h = 0.1;
+const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size ht
-const double endT = 0.1; // end time
+const double endT = 1; // end time
 
 // boundary condtions on top
 double a(double x)

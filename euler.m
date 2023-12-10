@@ -1,7 +1,7 @@
-m = 8;
-n = 8;
+m = 20;
+n = 20;
 
-h = 0.01;
+h = 0.1;
 tau = 0.01;
 
 % A: left side matrix 
@@ -36,18 +36,17 @@ for i = 1:m
         end
     end
 end
-A
+
 % init
 u = zeros(m*n, 1);
 % backward euler
 f = F(m, n, h);
-steps = 100;
-for i = 1:10
+steps = 10;
+for i = 1:steps
     br = u + th*f;
     u = A\br;
 end
-reshape(u, [m, n])
-
+imagesc(reshape(u, [m, n]))
 
 % boundary terms
 function y = F(m, n, h)

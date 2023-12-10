@@ -104,18 +104,23 @@ __global__ void backward_substitute_cu(const double* b, const CSRMatrix& U, doub
  */
 __global__ void elementwise_division_cu(double* D, double* x, int dim)
 {
+    
     for (int i = 0; i < dim; i++)
     {
         x[i] = x[i] / D[i];
     }
 }
 
-__global__ void init_L_cu(CSRMatrix& L, int m, int n)
-{
-
-}
-
-void init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n){
+/**
+ * @brief Pre-allocate non-zero position of L and Lt in CSR Format
+ * 
+ * @param L 
+ * @param Lt 
+ * @param m 
+ * @param n 
+ * @return __global__ 
+ */
+__global__ void init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n){
     // Initialize L and Lt matrix 
     // to avoid too many shifting, we pre-allocate the non-zero terms with zero
     L.rows = A.rows; L.non_zeros = 0;
@@ -173,8 +178,8 @@ __global__ void ldlt_cholesky_decomposition_cu(CSRMatrix& A, CSRMatrix& L, CSRMa
     
     // Assume L and Lt have zeros pre-allocated
     // init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n);
-
-    std::cout << "total rows: " << A.rows << std::endl;
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
     // LDL Cholesky Decomposition: we know L non-zero term position now   
     for (int j = 0; j < A.rows; j++) {
         double sumL = 0.0;
@@ -186,7 +191,6 @@ __global__ void ldlt_cholesky_decomposition_cu(CSRMatrix& A, CSRMatrix& L, CSRMa
         D[j] = A.get_ij(j,j) - sumL;  
         L.set_ij(j,j,1);
         Lt.set_ij(j,j,1);
-        // std::cout << j << " : " << D[j] << " - " << sumL << std::endl;
 
         // Calculate the off-diagonal elements of L on Row i, for all i > j, there are at most n+1 rows to update
         for (int i = j+1; i < j+n+1; i++) {
