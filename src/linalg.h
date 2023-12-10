@@ -405,5 +405,6 @@ void Backward_Euler_CSR(double *u, const int m, const int n)
     }
     free(b);
     free(f);
+    free(D);
 }
 #endif

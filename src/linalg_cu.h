@@ -54,6 +54,138 @@ void set_ij(CSRMatrix& A, int i, int j, double value)
     }
     return;
 }
+/**
+ * @brief cuda kernel to init Backward Euler Matrix A
+ */
+__global__ void initBackwardEulerMatrix_kernel(double* A_values, int* A_columns, int* A_row_ptr, double htinvhsq, int m, int n)
+{
+    // Initialize CSR matrix values and structure
+    
+    int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int row = i*n+j;
+    int count = 0;
+    double center = 1+4.0*htinvhsq;
+    double other = -htinvhsq;
+    if (i == 0) // first block
+    {
+        count = 0;
+        if (j == 0) // first row
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = center;
+            A_columns[count] = row;
+            A_values[count+1] = other;
+            A_columns[count+1] = row+1;
+            A_values[count+2] = other;
+            A_columns[count+2] = row+n;
+        }
+        count = 3 + 4*(j-1);
+        if (j > 0 && j < n-1)
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-1;
+            A_values[count+1] = center;
+            A_columns[count+1] = row;
+            A_values[count+2] = other;
+            A_columns[count+2] = row+1;
+            A_values[count+3] = other;
+            A_columns[count+3] = row+n;
+        }
+        else if (j == n-1)
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-1;
+            A_values[count+1] = center;
+            A_columns[count+1] = row;
+            A_values[count+2] = other;
+            A_columns[count+2] = row+n;
+        }
+    }
+    else if(i < m-1)
+    {
+        count = (i-1) * (5*n-2) + 4*n-2;
+        if (j == 0) 
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = center;
+            A_columns[count+1] = row;
+            A_values[count+2] = other;
+            A_columns[count+2] = row+1;
+            A_values[count+3] = other;
+            A_columns[count+3] = row+n;
+        }
+        count += 4 + 5*(j-1);
+        if (j > 0 && j < n-1)
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = other;
+            A_columns[count+1] = row-1;
+            A_values[count+2] = center;
+            A_columns[count+2] = row;
+            A_values[count+3] = other;
+            A_columns[count+3] = row+1;
+            A_values[count+4] = other;
+            A_columns[count+4] = row+n;
+        }
+        else if (j == n-1)
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = other;
+            A_columns[count+1] = row-1;
+            A_values[count+2] = center;
+            A_columns[count+2] = row;
+            A_values[count+3] = other;
+            A_columns[count+3] = row+n;
+        }
+    }
+    else if (i == m-1) // last block
+    {
+        count = (m-2) * (5*n-2) + 4*n-2; 
+        if (j == 0) 
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = center;
+            A_columns[count+1] = row;
+            A_values[count+2] = other;
+            A_columns[count+2] = row+1;
+        }
+        count += 3 + 4*(j-1);
+        if (j > 0 && j < n-1)
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = other;
+            A_columns[count+1] = row-1;
+            A_values[count+2] = center;
+            A_columns[count+2] = row;
+            A_values[count+3] = other;
+            A_columns[count+3] = row+1;
+        }
+        else if (j == n-1) // last row
+        {
+            A_row_ptr[row] = count;
+            A_values[count] = other;
+            A_columns[count] = row-n;
+            A_values[count+1] = other;
+            A_columns[count+1] = row-1;
+            A_values[count+2] = center;
+            A_columns[count+2] = row;
+            A_row_ptr[row+1] = count+3;
+        }
+    }
+}
 
 /**
  * @brief cuda kernel to compute forward substitution
@@ -120,54 +252,76 @@ __global__ void elementwise_division_cu(double* D, double* x, int dim)
  * @param n 
  * @return __global__ 
  */
-__global__ void init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n){
-    // Initialize L and Lt matrix 
+__global__ void init_L_kernel(double* L_values, int* L_columns, int* L_row_ptr, int m, int n)
+{
+    // Initialize L matrix 
     // to avoid too many shifting, we pre-allocate the non-zero terms with zero
-    L.rows = A.rows; L.non_zeros = 0;
-    Lt.rows = A.rows; Lt.non_zeros = 0;
 
-    // L: row 0 only have 1 element
-    L.row_ptr[0] = 0; int count = 0;
-    // L: row i from 1 to n has i non-zero elements
-    for (int i = 1; i < n+1; i++)
+    int row = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    // row 0 to n-1: row i has (i+1) elements
+    if (row < n)
     {
-        L.row_ptr[i] = L.row_ptr[i-1] + i; 
-        for (int j = 0; j < i; j++)
+        count = row*(row+1)/2;
+        L_row_ptr[row] = count;
+        for (int i = 0; i < row; i++)
         {
-            L.columns[count] = j; L.values[count] = 0; count++;
+            L_values[count] = 1;
+            L_columns[count] = i;
+            count++;
         }
     }
-    // L: row i from n+1 to m*n has n + 1 non-zero elements
-    for (int i = n+1; i < m*n+1; i++)
+    // row n to m*n-1: row i has (n+1) elements
+    else if(row < m*n)
     {
-        L.row_ptr[i] = L.row_ptr[i-1] + n + 1; 
-        for (int j = i - n - 1; j < i; j++)
+        count = n*(n+1)/2 + (row-n)*(n+1);
+        L_row_ptr[row] = count;
+        for (int i = 0; i < n+1; i++)
         {
-            L.columns[count] = j; L.values[count] = 0; count++;
+            L_values[count] = 1;
+            L_columns[count] = row-n+i;
+            count++;
+        }
+        if (row == m*n-1) // last line
+        {
+            L_row_ptr[row+1] = count;
         }
     }
-    L.non_zeros = count;
-    
-    // Lt: row i from 0 to m-n have n + 1 non-zero elements
-    count = 0; L.row_ptr[0] = 0;
-    for (int i = 1; i < m*n-n+1; i++)
+}
+__global__ void init_Lt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_ptr, int m, int n)
+{
+    // Initialize Lt matrix 
+    // to avoid too many shifting, we pre-allocate the non-zero terms with zero
+
+    int row = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    // row 0 to (m-1)*n-1: row i has (n+1) elements
+    if (row < (m-1)*n)
     {
-        Lt.row_ptr[i] = Lt.row_ptr[i-1] + n + 1; 
-        for (int j = -1; j < n; j++)
+        count = row*(n+1);
+        Lt_row_ptr[row] = count;
+        for (int i = 0; i < n; i++)
         {
-            Lt.columns[count] = i+j; Lt.values[count] = 0; count++;
+            Lt_values[count] = 1;
+            L_columns[count] = row+i;
+            count++;
         }
     }
-    // Lt: row i from m-n to m have m-i non-zero element
-    for (int i = m*n-n; i < m*n; i++)
+    // row (m-1)*n to m*n-1: row i has (m*n-i) elements
+    else if (row < m*n)
     {
-        Lt.row_ptr[i+1] = Lt.row_ptr[i] + m*n - i; 
-        for (int j = i; j < m*n; j++)
+        count = (m-1)*n*(n+1) + (n+m*n-row+1)(n-m*n+row)/2;
+        for (int i = 0; i < m*n-row; i++)
         {
-            Lt.columns[count] = j; Lt.values[count] = 0; count++;
+            Lt_values[count] = 1;
+            L_columns[count] = row+i;
+            count++;
+        }
+        if (row == m*n-1) // last row
+        {
+            L_row_ptr[row+1] = count;
         }
     }
-    Lt.non_zeros = count;
 }
 
 __global__ void ldlt_cholesky_decomposition_cu(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, double* D, int m, int n)
