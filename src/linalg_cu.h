@@ -1,59 +1,5 @@
 #include <cuda.h>
 
-// CSR Storage
-struct CSRMatrix {
-    double* values;   // Array storing non-zero values of the matrix
-    int* columns;     // Array storing column indices of non-zero values
-    int* row_ptr;      // Array storing row pointers (indices where each row starts)
-    int rows;          // Number of rows in the matrix
-    int capacity;      // maximum number of non-zeros
-    int non_zeros;     // Number of non-zero elements in the matrix; Essentially "Capacity";
-
-    // Constructor to initialize CSR Matrix
-    CSRMatrix(int rows, int capacity) : rows(rows), capacity(capacity) {
-        values = new double[capacity];
-        columns = new int[capacity];
-        row_ptr = new int[rows + 1];
-        non_zeros = 0;
-    }
-
-    // Destructor to free allocated memory
-    ~CSRMatrix() {
-        delete[] values;
-        delete[] columns;
-        delete[] row_ptr;
-    }
-};
-
-
-double get_ij(CSRMatrix& A, int i, int j) const 
-{
-    int start = row_ptr[i];
-    int end = row_ptr[i + 1];
-    for (int k = start; k < end; k++) {
-        if (columns[k] == j) {
-            return values[k];
-        }
-    }
-    // Column not found, as columns are in ascending order
-    return 0;
-}
-
-void set_ij(CSRMatrix& A, int i, int j, double value) 
-{
-    // Find the range of non-zero elements in the row
-    int start = A.row_ptr[i];
-    int end = A.row_ptr[i + 1];
-
-    // Check if the element already exists in the matrix
-    for (int k = start; k < end; k++) {
-        if (A.columns[k] == j) {
-            A.values[k] = value;  // Update existing value
-            return;
-        }
-    }
-    return;
-}
 /**
  * @brief cuda kernel to init Backward Euler Matrix A
  */
@@ -65,8 +11,10 @@ __global__ void initBackwardEulerMatrix_kernel(double* A_values, int* A_columns,
     int j = (blockIdx.y * blockDim.y) + threadIdx.y;
     int row = i*n+j;
     int count = 0;
-    double center = 1+4.0*htinvhsq;
-    double other = -htinvhsq;
+    // double center = 1+4.0*htinvhsq; 
+    // double other = -htinvhsq;
+    double center = 4.0; 
+    double other = -1;
     if (i == 0) // first block
     {
         count = 0;
@@ -264,7 +212,7 @@ __global__ void initL_kernel(double* L_values, int* L_columns, int* L_row_ptr, i
     if (row == 0)
     {
         L_row_ptr[row] = 0;
-        L_values[row] = 1;
+        L_values[row] = 0;
         L_columns[row] = 0;
     }
     // row 1 to n-1: row i has (i+1) elements
@@ -274,7 +222,7 @@ __global__ void initL_kernel(double* L_values, int* L_columns, int* L_row_ptr, i
         L_row_ptr[row] = count;
         for (int i = 0; i < row+1; i++)
         {
-            L_values[count] = 1;
+            L_values[count] = 0;
             L_columns[count] = i;
             count++;
         }
@@ -286,7 +234,7 @@ __global__ void initL_kernel(double* L_values, int* L_columns, int* L_row_ptr, i
         L_row_ptr[row] = count;
         for (int i = 0; i < n+1; i++)
         {
-            L_values[count] = 1;
+            L_values[count] = 0;
             L_columns[count] = row-n+i;
             count++;
         }
@@ -311,7 +259,7 @@ __global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_pt
         Lt_row_ptr[row] = count;
         for (int i = 0; i < n+1; i++)
         {
-            Lt_values[count] = 1;
+            Lt_values[count] = 0;
             Lt_columns[count] = row+i;
             count++;
         }
@@ -323,7 +271,7 @@ __global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_pt
         Lt_row_ptr[row] = count;
         for (int i = 0; i < m*n-row; i++)
         {
-            Lt_values[count] = 1;
+            Lt_values[count] = 0;
             Lt_columns[count] = row+i;
             count++;
         }
@@ -331,52 +279,5 @@ __global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_pt
         {
             Lt_row_ptr[row+1] = count;
         }
-    }
-}
-
-__global__ void ldlt_cholesky_decomposition_cu(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, double* D, int m, int n)
-{
-    // M : kernel
-    // Backward Euler: A = I + M*t*invhsq 
-    // so Ajj = 1 + 4*t*invhsq is fixed value
-    
-    // Assume L and Lt have zeros pre-allocated
-    // init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n);
-    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    // LDL Cholesky Decomposition: we know L non-zero term position now   
-    for (int j = 0; j < A.rows; j++) {
-        double sumL = 0.0;
-        // Calculate the diagonal element of L and update D
-        for (int k = 0; k < j; k++) {
-            double Ljk = L.get_ij(j, k);
-            sumL += Ljk * Ljk * D[k];
-        }
-        D[j] = A.get_ij(j,j) - sumL;  
-        L.set_ij(j,j,1);
-        Lt.set_ij(j,j,1);
-
-        // Calculate the off-diagonal elements of L on Row i, for all i > j, there are at most n+1 rows to update
-        for (int i = j+1; i < j+n+1; i++) {
-            double sumL2 = 0.0; 
-
-            double Aij = A.get_ij(i, j);
-            // sum up previous L values, find whether Lik or Ljk is zero or non-zero, there are at most n+1 non zero elements
-            // TBD: unroll first n loops
-            int st = std::max(0, j-n);
-            for (int k = st; k < j; k++)
-            {
-                // \sum_{k=1}^{j-1} L_{ik}*L_{jk}*D_{k}
-                sumL2 += L.get_ij(i,k) * L.get_ij(j,k) * D[k];
-            }
-            // store Lij if it is non-zeros, assume D[j] != 0
-            if (Aij - sumL2 != 0) {
-                double Lij = (Aij - sumL2) / D[j];
-                L.set_ij(i,j,Lij); 
-                Lt.set_ij(j,i,Lij);
-            }
-        }
-        // finished row
-        // std::cout << "finished col: " << j << std::endl;
     }
 }

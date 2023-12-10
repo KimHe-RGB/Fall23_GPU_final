@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.txt": "plaintext",
         "*.jsx": "javascriptreact",
         "__bit_reference": "cpp",
         "__bits": "cpp",
@@ -76,6 +77,20 @@
         "numeric": "cpp",
         "fstream": "cpp",
         "iomanip": "cpp",
-        "numbers": "cpp"
+        "numbers": "cpp",
+        "xhash": "cpp",
+        "xstring": "cpp",
+        "xmemory": "cpp",
+        "xutility": "cpp",
+        "list": "cpp",
+        "xfacet": "cpp",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xlocinfo": "cpp",
+        "xlocmon": "cpp",
+        "xlocnum": "cpp",
+        "xloctime": "cpp",
+        "xstddef": "cpp",
+        "xtr1common": "cpp"
     }
 }

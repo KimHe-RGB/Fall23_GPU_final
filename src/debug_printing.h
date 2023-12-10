@@ -21,7 +21,7 @@ void print_csr_matrix(const CSRMatrix& A) {
                 std::cout << A.values[valueIndex] << " ";
                 ++valueIndex;
             } else {
-                std::cout << " 0 ";
+                std::cout << " / ";
             }
         }
         std::cout << std::endl;
@@ -51,7 +51,7 @@ void print_diagonal(const double* D, const int dim){
 void print_csr_matrix_info(const CSRMatrix& A) {
     // Print values
     std::cout << "Values: ";
-    for (int i = 0; i < A.non_zeros; ++i) {
+    for (int i = 0; i < A.row_ptr[A.rows]; ++i) {
         std::cout << A.values[i] << " ";
     }
     std::cout << std::endl;
@@ -65,12 +65,11 @@ void print_csr_matrix_info(const CSRMatrix& A) {
 
     // Print columns
     std::cout << "Columns: ";
-    for (int i = 0; i < A.non_zeros; ++i) {
+    for (int i = 0; i < A.row_ptr[A.rows]; ++i) {
         std::cout << A.columns[i] << " ";
     }
     std::cout << std::endl;
-
-    std::cout << "non-zeros: " << A.non_zeros << std::endl;
+    std::cout << "non-zeros: " << A.row_ptr[A.rows] << std::endl;
     std::cout << "capacity: " << A.capacity << std::endl;
 }
 

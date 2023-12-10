@@ -1,0 +1,8 @@
+
+compile with default nvcc
+
+    nvcc ./main.cu -o ./heat
+
+ compile with different flag
+
+    nvcc ./main.cu -o ./heat -arch=compute_90 -code=sm_90
