@@ -252,19 +252,27 @@ __global__ void elementwise_division_cu(double* D, double* x, int dim)
  * @param n 
  * @return __global__ 
  */
-__global__ void init_L_kernel(double* L_values, int* L_columns, int* L_row_ptr, int m, int n)
+__global__ void initL_kernel(double* L_values, int* L_columns, int* L_row_ptr, int m, int n)
 {
     // Initialize L matrix 
     // to avoid too many shifting, we pre-allocate the non-zero terms with zero
 
     int row = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int count;
 
-    // row 0 to n-1: row i has (i+1) elements
-    if (row < n)
+    // row 0 has 1 elements
+    if (row == 0)
+    {
+        L_row_ptr[row] = 0;
+        L_values[row] = 1;
+        L_columns[row] = 0;
+    }
+    // row 1 to n-1: row i has (i+1) elements
+    else if (row < n)
     {
         count = row*(row+1)/2;
         L_row_ptr[row] = count;
-        for (int i = 0; i < row; i++)
+        for (int i = 0; i < row+1; i++)
         {
             L_values[count] = 1;
             L_columns[count] = i;
@@ -288,38 +296,40 @@ __global__ void init_L_kernel(double* L_values, int* L_columns, int* L_row_ptr, 
         }
     }
 }
-__global__ void init_Lt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_ptr, int m, int n)
+__global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_ptr, int m, int n)
 {
     // Initialize Lt matrix 
     // to avoid too many shifting, we pre-allocate the non-zero terms with zero
 
     int row = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int count;
 
     // row 0 to (m-1)*n-1: row i has (n+1) elements
     if (row < (m-1)*n)
     {
         count = row*(n+1);
         Lt_row_ptr[row] = count;
-        for (int i = 0; i < n; i++)
+        for (int i = 0; i < n+1; i++)
         {
             Lt_values[count] = 1;
-            L_columns[count] = row+i;
+            Lt_columns[count] = row+i;
             count++;
         }
     }
     // row (m-1)*n to m*n-1: row i has (m*n-i) elements
     else if (row < m*n)
     {
-        count = (m-1)*n*(n+1) + (n+m*n-row+1)(n-m*n+row)/2;
+        count = (m-1)*n*(n+1) + (n+m*n-row+1)*(n-m*n+row)/2;
+        Lt_row_ptr[row] = count;
         for (int i = 0; i < m*n-row; i++)
         {
             Lt_values[count] = 1;
-            L_columns[count] = row+i;
+            Lt_columns[count] = row+i;
             count++;
         }
         if (row == m*n-1) // last row
         {
-            L_row_ptr[row+1] = count;
+            Lt_row_ptr[row+1] = count;
         }
     }
 }

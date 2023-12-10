@@ -13,7 +13,7 @@
 #include <time.h>
 #include <cuda.h>
 #include <iostream>
-//#include "linalg_cu.h"
+#include "linalg_cu.h"
 #include "global.h"
 #include "debug_printing.h"
 
@@ -92,7 +92,16 @@ int main(int argc, char const *argv[])
     // Lt.rows = m*n;
     // print_csr_matrix(L);
     // print_csr_matrix(Lt);
-
+    
+    free(A_values_d);
+    free(A_columns_d);
+    free(A_row_ptr_d);
+    free(L_values_d);
+    free(L_columns_d);
+    free(L_row_ptr_d);
+    free(Lt_values_d);
+    free(Lt_columns_d);
+    free(Lt_row_ptr_d);
 
     
     
