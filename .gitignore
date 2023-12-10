@@ -4,6 +4,8 @@
 report/*
 *.gif
 build/*
+.DS_Store
+.vscode/
 
 # Compiled Object files
 *.slo

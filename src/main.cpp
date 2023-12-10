@@ -45,10 +45,6 @@ int main(int argc, char const *argv[])
     // solveAxb(L, Lt, D, b, x, temp_vec, MATRIX_DIM);
     // print_diagonal(x, MATRIX_DIM); // [0.6397, 0.7878, 0.6533, 0.9564, 0.9524, 0.7419, 0.6670, 0.6910, 0.5976]
 
-
-
-
-
     // Test: load heat map from csv:
     // example initial condition is 76 x 76
     // const int dim = 8;
@@ -70,9 +66,9 @@ int main(int argc, char const *argv[])
     // initialize boundary condition correction term
     double *f = (double *) malloc(dim*dim*sizeof(double));
     // Backward Euler steps
-    print_heat_map(u, dim, dim);
+    // print_heat_map(u, dim, dim);
     Backward_Euler_CSR(f, u, d, dim, dim);
-    print_heat_map(u, dim, dim);
+    // print_heat_map(u, dim, dim);
     
     
     snapshot("../outcome.gif", u, dim, dim, 1);
