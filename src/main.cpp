@@ -60,14 +60,14 @@ int main(int argc, char const *argv[])
     const int dim = 76;
     double *u = (double *) malloc(dim*dim*sizeof(double));
     loadCSV("../heat_map.csv", u, dim*dim);
-    double *d = (double *) malloc(dim*dim*sizeof(double));
-    double *temp_vec = (double *) malloc(dim*dim*sizeof(double));
+    // double *d = (double *) malloc(dim*dim*sizeof(double));
+    // double *temp_vec = (double *) malloc(dim*dim*sizeof(double));
     
     // initialize boundary condition correction term
-    double *f = (double *) malloc(dim*dim*sizeof(double));
+    //double *f = (double *) malloc(dim*dim*sizeof(double));
     // Backward Euler steps
     // print_heat_map(u, dim, dim);
-    Backward_Euler_CSR(f, u, d, dim, dim);
+    Backward_Euler_CSR(u, dim, dim);
     // print_heat_map(u, dim, dim);
     
     

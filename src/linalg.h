@@ -47,20 +47,13 @@ void computeBoundaryCondition(double* f, double *u, const int m, const int n)
 
 #ifndef __LIN_ALG_H
 #define __LIN_ALG_H
-/**
- * @brief Decompose spd matrix A into LDLt, such that A = L * D * L^T
- * 
- * @param A spd matrix in CSR Format
- * @param L Lower Triangular matrix in CSR Format
- * @param D diagonal matrix stored as a vector
- */
-void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, double* D, int m, int n) {
-
+void initCholeskyLLt(CSRMatrix& L, CSRMatrix& Lt, int m, int n)
+{
     // Initialize L and Lt matrix 
     // to avoid too many shifting, we pre-allocate the non-zero terms with zero
-    L.rows = A.rows;
+    L.rows = m*n;
     L.non_zeros = 0;
-    Lt.rows = A.rows;
+    Lt.rows = m*n;
     Lt.non_zeros = 0;
 
     // L: row 0 only have 1 element
@@ -105,6 +98,17 @@ void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, 
         }
     }
     Lt.non_zeros = count;
+}
+/**
+ * @brief Decompose spd matrix A into LDLt, such that A = L * D * L^T
+ * 
+ * @param A spd matrix in CSR Format
+ * @param L Lower Triangular matrix in CSR Format
+ * @param D diagonal matrix stored as a vector
+ */
+void ldlt_cholesky_decomposition_seq(CSRMatrix& A, CSRMatrix& L, CSRMatrix& Lt, double* D, int m, int n) {
+
+    initCholeskyLLt(L, Lt, m, n);
 
     std::cout << "total rows: " << A.rows << std::endl;
     // LDL Cholesky Decomposition: we know L non-zero term position now   
@@ -359,12 +363,13 @@ void initBackwardEulerCSRMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
  * @param m 
  * @param n 
  */
-void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int n)
+void Backward_Euler_CSR(double *u, const int m, const int n)
 {
     // u_{k+1} = (I + ht*invhsq*A) \ (u_k + ht*invhsq*f);
     double t = 0.0;
     const int MATRIX_DIM = m*n;
 
+    double *f = (double *) malloc(MATRIX_DIM*MATRIX_DIM*sizeof(double));
     computeBoundaryCondition(f, u, m, n);
     // left side
     std::cout << "init kernel" << std::endl;
@@ -373,6 +378,7 @@ void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int 
     // print_csr_matrix(A);
     CSRMatrix L = CSRMatrix(MATRIX_DIM, 5*m*m*n);
     CSRMatrix Lt = CSRMatrix(MATRIX_DIM, 5*m*m*n);
+    double *D = (double *) malloc(MATRIX_DIM*MATRIX_DIM*sizeof(double));
     std::cout << "start cholesky" << std::endl;
     ldlt_cholesky_decomposition_seq(A, L, Lt, D, m, n);
     // print_diagonal(D, MATRIX_DIM);
@@ -398,5 +404,6 @@ void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int 
         // print_heat_map(u, m, n);
     }
     free(b);
+    free(f);
 }
 #endif
