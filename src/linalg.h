@@ -367,6 +367,39 @@ void Backward_Euler_CSR(double *f, double *u, double* D, const int m, const int 
     free(b);
 }
 
+/**
+ * @brief Compute the boundary condition term for the RHS, here we assume boundary condition to be constant 0 all the time
+ * 
+ * @param f the boundary condition 
+ * @param m 
+ */
+void computeBoundaryCondition(double* f, double *u, const int m, const int n)
+{
+    for (int i = 0; i < m*n; i++)
+    {
+        f[i] = 0;
+    }
+    f[0] = a(h) + b(h); // TL corner
+    f[n-1] = a(n*h) + d(h); // TR corner
+    f[(m-1)*n] = b(m*h) + c(h); // BL corner
+    f[m*n-1] = c(m*h) + d(n*h); // BR corner
+    // boundary condition on top row, except the 1st and nth col
+    for (int i = 1; i < n-1; i++)
+    {
+        f[i] = a(h*(i+1));
+    }
+    // boundary condition on left and right col, except 1st and last row
+    for (int i = n; i < (m-1)*n; i+=n)
+    {
+        f[i] = b(h*i/n);
+        f[i+n-1] = d(h*i/n);
+    }
+    // boundary condition on bottom row, except the 1st and nth col
+    for (int i = (m-1)*n + 1; i < m*n - 1; i++)
+    {
+        f[i] = c(h*(i-(m-1)*n));
+    }
+}
 
 
 #endif
