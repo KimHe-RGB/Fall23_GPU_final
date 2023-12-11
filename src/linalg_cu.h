@@ -285,3 +285,49 @@ __global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_pt
         }
     }
 }
+
+/**
+ * @brief Compute Boundary Condition terms
+*/
+__global__ void BoundaryCondition_kernel(double* f, int m, int n, double h)
+{
+    int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int index = i*n+j;
+
+    if (i < m && j < n)
+    {
+        f[index] = 0;
+        if (i == 0) // top row
+        {
+            f[index] += a(h*(j+1));
+        }
+        if (j == 0) // left column
+        {
+            f[index] += b(h*(i+1));
+        }
+        if (j == n-1) // right column
+        {
+            f[index] += d(h*(i+1));
+        }
+        if (i == m-1) // bottom row
+        {
+            f[index] += c(h*(j+1));
+        }
+    }
+    
+    
+}
+
+/**
+ * @brief Backward Euler update b kernel
+*/
+__global__ void Updateb_kernel(double *b, double *u, double*f, double tinvhsq, int MATRIX_DIM)
+{
+    int id = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    if (id < MATRIX_DIM)
+    {
+        b[id] = u[id] + f[id]*tinvhsq;
+    }
+}

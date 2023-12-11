@@ -154,6 +154,33 @@ int main(int argc, char const *argv[]){
     print_csr_matrix_info(A);
     print_csr_matrix(L);
     print_csr_matrix_info(L);
+
+    // Boundary Condition terms
+    double* f_d;
+    cudaMalloc((void **)&f_d, m*n*sizeof(double));
+    int BCthread_x = 8;
+    int BCthread_y = 8;
+    dim3 BCgrid(m/BCthread_x+1, n/BCthread_y+1, 1);
+    dim3 BCblock(BCthread_x, BCthread_y, 1);
+    BoundaryCondition_kernel<<<BCgrid, BCblock>>>(f_d, m, n, h);
+    cudaDeviceSynchronize();
+
+    // Backward Euler steps
+    int BEthread = 64;
+    int BEblock = m*n/BEthread + 1;
+    int total_steps = 1; //endT/tau;
+    // allocate memory to store u and b on device
+    double *u_d, *b_d;
+    cudaMalloc((void **)&u_d, m*n*sizeof(double));
+    cudaMalloc((void **)&b_d, m*n*sizeof(double));
+    cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
+    for (int p = 0; p < total_steps; p++)
+    {
+        // launch kernel to compute updated b
+        Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, MATRIX_DIM);
+        cudaDeviceSynchronize();
+        // solveAxb(L, Lt, D, b, u, MATRIX_DIM); TBA
+    }
     
     cudaFree(A_values_d);
     cudaFree(A_columns_d);
@@ -164,6 +191,9 @@ int main(int argc, char const *argv[]){
     cudaFree(Lt_values_d);
     cudaFree(Lt_columns_d);
     cudaFree(Lt_row_ptr_d);
+    cudaFree(u_d);
+    cudaFree(f_d);
+    cudaFree(b_d);
     std::cout << "reached the end" << std::endl;
 }
 
