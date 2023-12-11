@@ -194,6 +194,12 @@ int main(int argc, char const *argv[]){
     cudaFree(u_d);
     cudaFree(f_d);
     cudaFree(b_d);
+    cudaError_t error = cudaGetLastError();
+    if(error!=cudaSuccess)
+    {
+        fprintf(stderr,"ERROR: %s\n", cudaGetErrorString(error) );
+        exit(-1);
+    }
     std::cout << "reached the end" << std::endl;
 }
 
