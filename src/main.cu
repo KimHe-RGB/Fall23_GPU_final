@@ -177,7 +177,7 @@ int main(int argc, char const *argv[]){
     for (int p = 0; p < total_steps; p++)
     {
         // launch kernel to compute updated b
-        Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, MATRIX_DIM);
+        Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
         cudaDeviceSynchronize();
         // solveAxb(L, Lt, D, b, u, MATRIX_DIM); TBA
     }
