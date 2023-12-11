@@ -25,7 +25,7 @@
 
 __global__ void computeOffDiagonalL(double* A_values, int* A_columns, int* A_row_ptr, double* D, double* L_values, int* L_columns, int* L_row_ptr, int n);
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len);
+                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int n);
 // __global__ void ldlt_cu();
 
@@ -51,13 +51,12 @@ void printArray(double *D, int dim) {
     }
     
 }
-
-const int THREAD_BLOCK_SIZE = 4;
-
+const int M = 4;
+const int N = 4;
 int main(int argc, char const *argv[]){
 
-    const int m = 4;
-    const int n = 4; 
+    const int m = M;
+    const int n = N; 
     // const MATRIX_DIM = 1;
     double *u = (double *) malloc(m*n*sizeof(double));
     // loadCSV("../heat_map.csv", u, m*n);
@@ -124,21 +123,30 @@ int main(int argc, char const *argv[]){
     L.rows = m*n;
     Lt.rows = m*n;
 
-    const int grid_size = 4;
-    const int block_size = THREAD_BLOCK_SIZE;
+    const int grid_size = 1;
+    const int block_size = 4;
     for (int J = 0; J < m*n; J++) // loop through all columns
     {
         // kernel update Djj
         ldlt_Dj_cu<<<grid_size,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d, n);
         // kernel update Lij for all i > j
-        if (J > m*n-n)
+        if (J < n)
+        {
+            const int col_len = n;
+            const int row_len = J;
+            ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len); 
+        }
+        else if (J > m*n-n)
         {
             const int col_len = m*n - J;
-            ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len);
+            const int row_len = n;
+            ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
         }
         else
         {
-            ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, n);
+            const int col_len = n;
+            const int row_len = n;
+            ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
         }
         // computeOffDiagonalL<<<grid_size,block_size>>>(J, A_values_d, A_columns_d, A_row_ptr_d, D_d, L_values_d, L_columns_d, L_row_ptr_d, n);
     }
@@ -203,23 +211,30 @@ int main(int argc, char const *argv[]){
     std::cout << "reached the end" << std::endl;
 }
 
-/**
- * @brief finding if A_ij exists
- * 
- * @param I 
- * @param J 
- * @param Avalues 
- * @param Acolumns 
- * @param Arow_ptr 
- * @return __device__ 
- */
-__device__ int get_ij(int I, int J, double *Avalues, int *Acolumns, int *Arow_ptr)
+__device__ double get_ij(int* row_ptr, int* columns, double *values, int i, int j) 
 {
-    for (int p = Arow_ptr[I]; p < Arow_ptr[I+1]; p++)
-    {
-        if (J == Acolumns[p]) return Avalues[p];
+    int start = row_ptr[i];
+    int end = row_ptr[i + 1];
+    for (int k = start; k < end; k++) {
+        if (columns[k] == j) {
+            return values[k];
+        }
     }
+    // Column not found, as columns are in ascending order
     return 0;
+}
+__device__ void set_ij(int* row_ptr, int* columns, double *values, int i, int j, double value) 
+{
+    int start = row_ptr[i];
+    int end = row_ptr[i + 1];
+    // Check if the element already exists in the matrix
+    for (int k = start; k < end; k++) {
+        if (columns[k] == j) {
+            values[k] = value;  // Update existing value
+            return;
+        }
+    }
+    return;
 }
 
 /**
@@ -236,67 +251,104 @@ __device__ int get_ij(int I, int J, double *Avalues, int *Acolumns, int *Arow_pt
  * @return __global__ 
  */
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len)
+                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len)
 {    
     // Assume L and Lt have zeros pre-allocated
-    // init_L_Lt_cu(CSRMatrix& L, CSRMatrix& Lt, int m, int n); need to be called beforehand
-    const unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    const unsigned int total_t = blockDim.x * gridDim.x;
+    // const unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    // const unsigned int total_t = blockDim.x * gridDim.x;
+    
     // assuming total_t << N
     // we let kth thread handle from row k*bh to (k+1)*bh
     // the last thread will handle the middle rows
-    const int N = 4;
-    const int row_len = Lrow_ptr[J+1]-Lrow_ptr[J]; // 
-    // const int col_len = N;            // for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
-    const int th = N/total_t + 1;                  // the number of rows that each thread handle
-    const int tw = col_len/total_t + 1;                  // number of cols that each thread fills into the shared memory 
-    int local_i = 0;
+    // const int col_len = N;            // total number of entries to update ;for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
     const double DJ = D[J];
 
     // load shared memory
-    __shared__ double Lj_[N]; // shared Jth row, we set length be N, for small J its tail is not initialized, so effective range is Lrow_ptr[J+1]-Lrow_ptr[J]
-    // Iterate through entries and copy data from global memory to shared memory, assuming total_t*tw > N so that Lj_ is filled up
-    for (int iter = 0; iter < tw; ++iter) {
-        int globalIndex = tid*tw + iter;
-        // Check if the global index is within the bounds of the row
-        if (globalIndex < row_len) {
-            int sharedIndex = tid*tw + iter;
-            Lj_[sharedIndex] = Lvalues[Lrow_ptr[J]+sharedIndex];
-        }
-    }
+    // extern __shared__ double Lj_[];
+    // const int thread_load = row_len/blockDim.x; 
+
+    // for (int i = 0; i < thread_load; i++)
+    // {
+    //     Lj_[threadIdx.x*thread_load + i] = Lvalues[Lrow_ptr[J] + threadIdx.x*thread_load + i];
+    // }
+    // if (threadIdx.x == 0) {
+    //     for (int i = thread_load*blockDim.x; i < row_len; i++) Lj_[i] = Lvalues[Lrow_ptr[J] + i];
+    // }
+    
     __syncthreads();
 
-    for (local_i=0; local_i<th; local_i++) // loop the rows, assuming total_t*th >= col_len so that all entries Lijs are covered
+    for (int local_i = 0; local_i < col_len; local_i++)
     {
-        double sumL2 = 0;
-        const int global_i = J + th*tid + local_i + 1; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
-        if (global_i < N + 1) 
+        const int global_i = J + 1 + blockIdx.x + gridDim.x * local_i;
+        
+        if (global_i < J + col_len + 1) 
         {
-            for (int k = 0; k < J; k++)
+            const int ith_row_len = row_len - gridDim.x * local_i - blockIdx.x;
+            for (int local_k = 0; local_k < ith_row_len; local_k++)
             {
-                double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
-                double Ljk = Lvalues[k+Lrow_ptr[J]];
-                sumL2 += Lik * Ljk * D[k];
+                const int global_k = blockDim.x * local_k + threadIdx.x;
+                if (global_k < J) {
+                    const int Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, global_k);
+                    const int Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
+                    const int Dk = D[global_k];
+                    set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, Lik * Ljk * Dk); // sum_{k=0}^{j-1} Lik * Ljk 
+                }
             }
-            // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
-            double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
-            int x = Lrow_ptr[global_i];
-            Lvalues[x+J] = (Aij - sumL2)/DJ;
-        } 
-        else if (global_i < J + col_len + 1) // middle cols 
-        {
-            for (int k = J-N; k < J; k++)
+            __syncthreads();
+            if (threadIdx.x == 0)
             {
-                double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
-                double Ljk = Lvalues[k+Lrow_ptr[J]];
-                sumL2 += Lik * Ljk * D[k];
-            }
-            // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
-            double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
-            int x = Lrow_ptr[global_i];
-            Lvalues[x+J-global_i+N] = (Aij - sumL2)/DJ;
-        }
+                const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
+                const double value = (Aij - get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J)) / DJ;
+                set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value); // sum_{k=0}^{j-1} Lik * Ljk 
+            }  
+        }      
     }
+
+    // for (local_i=0; local_i<th; local_i++) // loop the rows, assuming total_t*th >= col_len so that all entries Lijs are covered
+    // {
+    //     double sumL2 = 0;
+    //     const int global_i = J + th*tid + local_i + 1; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
+    //     if (global_i < N + 1) 
+    //     {
+    //         int x = Lrow_ptr[global_i];
+    //         // for (int k = 0; k < J; k++)
+    //         for (int k = 0; k < J; k++) 
+    //         {
+    //             // double Lik = Lvalues[x+k]; 
+    //             // double Ljk = Lvalues[Lrow_ptr[J]+k];
+    //             double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, k);
+    //             double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, k);
+    //             sumL2 += Lik * Ljk * D[k];
+    //         }
+    //         // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
+    //         double Aij = 0;
+    //         for (int p = Arow_ptr[global_i]; p < Arow_ptr[global_i+1]; p++)
+    //         {
+    //             if (J == Acolumns[p]) Aij = Avalues[p];
+    //         }
+    //         Lvalues[x+J] = (Aij - sumL2) / DJ;
+    //     } 
+    //     else if (global_i < J + col_len + 1) // middle cols 
+    //     {
+    //         int x = Lrow_ptr[global_i];
+    //         // for (int k = 0; k < J-Lcolumns[x]; k++) 
+    //         for (int k = J - N; k < J; k++) 
+    //         {
+    //             // double Lik = Lvalues[x+k]; 
+    //             // double Ljk = Lvalues[Lrow_ptr[J]+k+global_i-J];
+    //             double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, k);
+    //             double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, k);
+    //             sumL2 += Lik * Ljk * D[k+global_i-J];
+    //         }
+    //         // set Lij = (Aij - sumL2) / DJ, need to figure out if Aij = 0 or not
+    //         double Aij = 0;
+    //         for (int p = Arow_ptr[global_i]; p < Arow_ptr[global_i+1]; p++)
+    //         {
+    //             if (J == Acolumns[p]) Aij = Avalues[p];
+    //         }
+    //         Lvalues[x+J-global_i+N] = (Aij - sumL2) / DJ;
+    //     }
+    // }
 }
 
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int N)
@@ -317,101 +369,3 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
         Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
     }
 }
-
-// void initializeCSRMatrix(double *A_values_d, int *A_columns_d, int *A_row_ptr_d, int m, int n) {
-//     int matrix_size = m * n;
-
-//     // Initialize CSR matrix values and structure
-//     int index_curr, index_next, index_prev, index_up, index_down;
-//     int current_element = 0;
-
-//     for (int i = 0; i < matrix_size; ++i) {
-//         index_curr = i * matrix_size + i;
-
-//         // A_{i-1,j}
-//         index_up = index_curr - n;
-//         if (index_up >= i * matrix_size) {
-//             A_values_d[current_element] = -1.0;
-//             A_columns_d[current_element] = i - n;
-//             current_element++;
-//         }
-
-//         // A_{i,j-1}
-//         index_prev = index_curr - 1;
-//         if (index_prev >= i * matrix_size) {
-//             A_values_d[current_element] = -1.0;
-//             A_columns_d[current_element] = i - 1;
-//             current_element++;
-//         }
-
-//         // A_{i,j}
-//         A_values_d[current_element] = 4.0;
-//         A_columns_d[current_element] = i;
-//         current_element++;
-
-//         // A_{i,j+1}
-//         index_next = index_curr + 1;
-//         if (index_next < (i + 1) * matrix_size) {
-//             A_values_d[current_element] = -1.0;
-//             A_columns_d[current_element] = i + 1;
-//             current_element++;
-//         }
-        
-//         // A_{i+1,j}
-//         index_down = index_curr + n;
-//         if (index_down < (i + 1) * matrix_size) {
-//             A_values_d[current_element] = -1.0;
-//             A_columns_d[current_element] = i + n;
-//             current_element++;
-//         }
-
-//         // March the row pointer by 1
-//         A_row_ptr_d[i + 1] = current_element;
-//     }
-// }
-
-
-// // Initialize L and Lt matrix to avoid shifting during insertion, 
-// // based on the sparsity structure of L and Lt, we pre-allocate the non-zero terms with zero
-// void init_L_Lt(double *L_values_d, int *L_columns_d, int *L_row_ptr_d, 
-//               double *Lt_values_d, int *Lt_columns_d, int *Lt_row_ptr_d, int m, int n) {
-//     // L: row 0 only have 1 element
-//     L_row_ptr_d[0] = 0; int count = 0;
-//     // L: row i from 1 to n has i non-zero elements
-//     for (int i = 1; i < n+1; i++)
-//     {
-//         L_row_ptr_d[i] = L_row_ptr_d[i-1] + i; 
-//         for (int j = 0; j < i; j++)
-//         {
-//             L_columns_d[count] = j; L_values_d[count] = 0; count++;
-//         }
-//     }
-//     // L: row i from n+1 to m*n has n + 1 non-zero elements
-//     for (int i = n+1; i < m*n+1; i++)
-//     {
-//         L_row_ptr_d[i] = L_row_ptr_d[i-1] + n + 1; 
-//         for (int j = i - n - 1; j < i; j++)
-//         {
-//             L_columns_d[count] = j; L_values_d[count] = 0; count++;
-//         }
-//     }    
-//     // Lt: row i from 0 to m-n have n + 1 non-zero elements
-//     count = 0; Lt_row_ptr_d[0] = 0;
-//     for (int i = 1; i < m*n-n+1; i++)
-//     {
-//         Lt_row_ptr_d[i] = Lt_row_ptr_d[i-1] + n + 1; 
-//         for (int j = -1; j < n; j++)
-//         {
-//             Lt_columns_d[count] = i+j; Lt_values_d[count] = 0; count++;
-//         }
-//     }
-//     // Lt: row i from m-n to m have m-i non-zero element
-//     for (int i = m*n-n; i < m*n; i++)
-//     {
-//         Lt_row_ptr_d[i+1] = Lt_row_ptr_d[i] + m*n - i; 
-//         for (int j = i; j < m*n; j++)
-//         {
-//             Lt_columns_d[count] = j; Lt_values_d[count] = 0; count++;
-//         }
-//     }
-// }
