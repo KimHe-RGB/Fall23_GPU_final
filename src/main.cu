@@ -15,11 +15,15 @@
 #include <iostream>
 #include "debug_printing.h"
 #include "linalg_cu.h"
-#include "global.h"
 
-void init_L_Lt(double *L_values_d, int *L_columns_d, int *L_row_ptr_d, 
-              double *Lt_values_d, int *Lt_columns_d, int *Lt_row_ptr_d, int m, int n);
-void initializeCSRMatrix(double *A_values_d, int *A_columns_d, int *A_row_ptr_d, int m, int n);
+#ifndef __GLOBAL_H
+#include "global.h"
+#endif
+
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
+__global__ void computeOffDiagonalL(double* A_values, int* A_columns, int* A_row_ptr, double* D, double* L_values, int* L_columns, int* L_row_ptr, int n);
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len);
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int n);
@@ -47,6 +51,9 @@ void printArray(double *D, int dim) {
     }
     
 }
+
+const int THREAD_BLOCK_SIZE = 4;
+
 int main(int argc, char const *argv[]){
 
     const int m = 4;
@@ -118,7 +125,7 @@ int main(int argc, char const *argv[]){
     Lt.rows = m*n;
 
     const int grid_size = 4;
-    const int block_size = 4;
+    const int block_size = THREAD_BLOCK_SIZE;
     for (int J = 0; J < m*n; J++) // loop through all columns
     {
         // kernel update Djj
@@ -133,6 +140,7 @@ int main(int argc, char const *argv[]){
         {
             ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, n);
         }
+        // computeOffDiagonalL<<<grid_size,block_size>>>(J, A_values_d, A_columns_d, A_row_ptr_d, D_d, L_values_d, L_columns_d, L_row_ptr_d, n);
     }
     cudaMemcpy(d, D_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
     print_diagonal(d, m*n);
@@ -158,137 +166,6 @@ int main(int argc, char const *argv[]){
     cudaFree(Lt_row_ptr_d);
     std::cout << "reached the end" << std::endl;
 }
-// {   
-//     const int M = 8; const int N = 8;
-//     double *A_values_d; int *A_columns_d;int *A_row_ptr_d;
-//     double *L_values_d; int *L_columns_d;int *L_row_ptr_d;
-//     double *Lt_values_d; int *Lt_columns_d;int *Lt_row_ptr_d;
-//     double *D_d;
-//     const int L_VAL_SIZE = (M*N-N)*N+(N*N+N)/2;
-
-//     double *D = (double *) malloc(M*N*sizeof(double)); // store the diagonal matrix
-
-//     double *A_values = (double *) malloc(sizeof(double)*5*M*N);
-//     int *A_columns = (int *) malloc(sizeof(int)*5*M*N);
-//     int *A_row_ptr = (int *) malloc(sizeof(int)*(M*N+1));
-
-//     double *L_values = (double *) malloc(sizeof(double)*L_VAL_SIZE);
-//     int *L_columns = (int *) malloc(sizeof(int)*L_VAL_SIZE);
-//     int *L_row_ptr = (int *) malloc(sizeof(int)*(M*N+1));
-    
-//     double *Lt_values = (double *) malloc(sizeof(double)*L_VAL_SIZE);
-//     int *Lt_columns = (int *) malloc(sizeof(int)*L_VAL_SIZE);
-//     int *Lt_row_ptr = (int *) malloc(sizeof(int)*(M*N+1));
-
-//     cudaMalloc((void **)&A_values_d, sizeof(double)*5*M*N);
-//     cudaMalloc((void **)&A_columns_d, sizeof(int)*5*M*N);
-//     cudaMalloc((void **)&A_row_ptr_d, sizeof(int)*(M*N+1));
-
-//     cudaMalloc((void **)&L_values_d, sizeof(double)*L_VAL_SIZE);
-//     cudaMalloc((void **)&L_columns_d, sizeof(int)*L_VAL_SIZE);
-//     cudaMalloc((void **)&L_row_ptr_d, sizeof(int)*(M*N+1));
-
-//     cudaMalloc((void **)&Lt_values_d, sizeof(double)*L_VAL_SIZE);
-//     cudaMalloc((void **)&Lt_columns_d, sizeof(int)*L_VAL_SIZE);
-//     cudaMalloc((void **)&Lt_row_ptr_d, sizeof(int)*(M*N+1));
-
-//     cudaMalloc((void **)&D_d, sizeof(double)*M*N);
-
-
-//     // init A
-//     int initA_thread_x = 8;
-//     int initA_thread_y = 8;
-//     dim3 initA_grid(M/initA_thread_x+1, N/initA_thread_y+1, 1);
-//     dim3 initA_block(initA_thread_x, initA_thread_y, 1);
-//     initBackwardEulerMatrix_kernel<<<initA_grid, initA_block>>>(A_values_d, A_columns_d, A_row_ptr_d, tau*invhsq, M, N);
-//     cudaDeviceSynchronize();
-    
-//     // init L, LT\t
-//     int initL_thread = 64;
-//     dim3 initL_grid(M*N/initL_thread+1, 1, 1);
-//     dim3 initL_block(initL_thread, 1, 1);
-//     initL_kernel<<<initL_grid, initL_block>>>(L_values_d, L_columns_d, L_row_ptr_d, M, N);
-//     cudaDeviceSynchronize();
-//     initLt_kernel<<<initL_grid, initL_block>>>(Lt_values_d, Lt_columns_d, Lt_row_ptr_d, M, N);
-//     cudaDeviceSynchronize();
-
-
-//     const int block_size = 4;
-//     const int grid_size = 1;
-
-//     cudaMemcpy(A_values_d, A_values, sizeof(double)*5*M*N, cudaMemcpyHostToDevice);
-//     cudaMemcpy(A_columns_d, A_columns, sizeof(int)*5*M*N, cudaMemcpyHostToDevice);
-//     cudaMemcpy(A_row_ptr_d, A_row_ptr, sizeof(int)*(M*N+1), cudaMemcpyHostToDevice);
- 
-//     cudaMemcpy(L_values_d, L_values, sizeof(double)*L_VAL_SIZE, cudaMemcpyHostToDevice);
-//     cudaMemcpy(L_columns_d, L_columns, sizeof(int)*L_VAL_SIZE, cudaMemcpyHostToDevice);
-//     cudaMemcpy(L_row_ptr_d, L_row_ptr, sizeof(int)*(M*N+1), cudaMemcpyHostToDevice);
-
-//     cudaMemcpy(Lt_values_d, Lt_values, sizeof(double)*L_VAL_SIZE, cudaMemcpyHostToDevice);
-//     cudaMemcpy(Lt_columns_d, Lt_columns, sizeof(int)*L_VAL_SIZE, cudaMemcpyHostToDevice);
-//     cudaMemcpy(Lt_row_ptr_d, Lt_row_ptr, sizeof(int)*(M*N+1), cudaMemcpyHostToDevice);
-
-//     cudaMemcpy(D_d, D, M*N*sizeof(double), cudaMemcpyHostToDevice);
-
-//     for (int J = 0; J < M*N; J++) // loop through all columns
-//     {
-//     //     // kernel update Djj
-//     //    ldlt_Dj_cu<<<grid_size,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
-//     //     // kernel update Lij for all i > j
-//     //     if (J > M*N-N)
-//     //     {
-//     //         const int col_len = M*N - J;
-//     //         ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len);
-//     //     }
-//     //     else
-//     //     {
-//     //         ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, N);
-//     //     }
-//     }
-
-//     cudaMemcpy(A_values, A_values_d, sizeof(double)*5*M*N, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(A_columns, A_columns_d, sizeof(int)*5*M*N, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(A_row_ptr, A_row_ptr_d, sizeof(int)*(M*N+1), cudaMemcpyDeviceToHost);
-//     cudaMemcpy(D, D_d, M*N*sizeof(double), cudaMemcpyDeviceToHost);
-
-//     cudaMemcpy(L_values, L_values_d, sizeof(double)*L_VAL_SIZE, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(L_columns, L_columns_d, sizeof(int)*L_VAL_SIZE, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(L_row_ptr, L_row_ptr_d, sizeof(int)*(M*N+1), cudaMemcpyDeviceToHost);
-
-//     cudaMemcpy(Lt_values, Lt_values_d, sizeof(double)*L_VAL_SIZE, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(Lt_columns, Lt_columns_d, sizeof(int)*L_VAL_SIZE, cudaMemcpyDeviceToHost);
-//     cudaMemcpy(Lt_row_ptr, Lt_row_ptr_d, sizeof(int)*(M*N+1), cudaMemcpyDeviceToHost);
-
-
-//     // print out
-//     std::cout << "reached the end" << std::endl;
-//     printCSR(A_values, A_columns, A_row_ptr, M, N);
-//     // printCSR(L_values, L_columns, L_row_ptr, M, N);
-//     printArray(D, M*N);
-//     // // test init L, Lt
-//     // cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
-//     // cudaMemcpy(L.columns, L_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
-//     // cudaMemcpy(L.row_ptr, L_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-//     // cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
-//     // cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
-//     // cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-//     // L.rows = m*n;
-//     // Lt.rows = m*n;
-//     // print_csr_matrix(L);
-//     // print_csr_matrix(Lt);
-    
-//     free(A_values_d);
-//     free(A_columns_d);
-//     free(A_row_ptr_d);
-//     free(L_values_d);
-//     free(L_columns_d);
-//     free(L_row_ptr_d);
-//     free(Lt_values_d);
-//     free(Lt_columns_d);
-//     free(Lt_row_ptr_d);
-
-//     return 0;
-// }
 
 /**
  * @brief finding if A_ij exists
@@ -353,33 +230,32 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
     }
     __syncthreads();
 
-    int globalOffset = J+1;
     for (local_i=0; local_i<th; local_i++) // loop the rows, assuming total_t*th >= col_len so that all entries Lijs are covered
     {
         double sumL2 = 0;
-        const int global_i = globalOffset + th*tid + local_i; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
+        const int global_i = J + th*tid + local_i + 1; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
         if (global_i < N + 1) 
         {
-            for (int k = 0; k < globalOffset; k++)
+            for (int k = 0; k < J; k++)
             {
                 double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
-                double Ljk = Lj_[k];
+                double Ljk = Lvalues[k+Lrow_ptr[J]];
                 sumL2 += Lik * Ljk * D[k];
             }
-            // set Lij = (Aij - sumL2) / Dj
-            // need to figure out if Aij = 0 or not
+            // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
             double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
             int x = Lrow_ptr[global_i];
             Lvalues[x+J] = (Aij - sumL2)/DJ;
         } 
-        else if (global_i < globalOffset + col_len) // middle cols 
+        else if (global_i < J + col_len + 1) // middle cols 
         {
-            for (int k = 0; k < global_i; k++)
+            for (int k = J-N; k < J; k++)
             {
                 double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
-                double Ljk = Lj_[k];
+                double Ljk = Lvalues[k+Lrow_ptr[J]];
                 sumL2 += Lik * Ljk * D[k];
             }
+            // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
             double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
             int x = Lrow_ptr[global_i];
             Lvalues[x+J-global_i+N] = (Aij - sumL2)/DJ;
@@ -389,8 +265,6 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
 
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int N)
 {
-    double sumL = 0;
-
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < Lrow_ptr[J+1] - Lrow_ptr[J])
     {

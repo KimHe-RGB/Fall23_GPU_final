@@ -1,5 +1,9 @@
 #include <cuda.h>
 
+#ifndef __GLOBAL_H
+#include "global.h"
+#endif
+
 /**
  * @brief cuda kernel to init Backward Euler Matrix A
  */
