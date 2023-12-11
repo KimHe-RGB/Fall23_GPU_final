@@ -5,7 +5,7 @@
 #ifndef __DEBUG_PRINT_H
 #define __DEBUG_PRINT_H
 #include <iostream>
-
+#include <iomanip>
 /**
  * @brief Print out a CSRMatrix as a full matrix
  * 
@@ -18,7 +18,7 @@ void print_csr_matrix(const CSRMatrix& A) {
         int valueIndex = A.row_ptr[i];
         for (int j = 0; j < rows; ++j) {
             if (valueIndex < A.row_ptr[i + 1] && A.columns[valueIndex] == j) {
-                std::cout << A.values[valueIndex] << " ";
+                std::cout << std::setprecision(4) << " " << A.values[valueIndex] << " ";
                 ++valueIndex;
             } else {
                 std::cout << " / ";

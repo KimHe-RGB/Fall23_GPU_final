@@ -22,7 +22,7 @@ void init_L_Lt(double *L_values_d, int *L_columns_d, int *L_row_ptr_d,
 void initializeCSRMatrix(double *A_values_d, int *A_columns_d, int *A_row_ptr_d, int m, int n);
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len);
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int n);
 // __global__ void ldlt_cu();
 
 void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
@@ -117,12 +117,12 @@ int main(int argc, char const *argv[]){
     L.rows = m*n;
     Lt.rows = m*n;
 
-    const int grid_size = 1;
-    const int block_size = 1;
-    for (int J = 0; J < 3; J++) // loop through all columns
+    const int grid_size = 4;
+    const int block_size = 4;
+    for (int J = 0; J < m*n; J++) // loop through all columns
     {
         // kernel update Djj
-        ldlt_Dj_cu<<<grid_size,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
+        ldlt_Dj_cu<<<grid_size,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d, n);
         // kernel update Lij for all i > j
         if (J > m*n-n)
         {
@@ -332,7 +332,7 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
     // assuming total_t << N
     // we let kth thread handle from row k*bh to (k+1)*bh
     // the last thread will handle the middle rows
-    const int N = 3;
+    const int N = 4;
     const int row_len = Lrow_ptr[J+1]-Lrow_ptr[J]; // 
     // const int col_len = N;            // for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
     const int th = N/total_t + 1;                  // the number of rows that each thread handle
@@ -342,14 +342,12 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
 
     // load shared memory
     __shared__ double Lj_[N]; // shared Jth row, we set length be N, for small J its tail is not initialized, so effective range is Lrow_ptr[J+1]-Lrow_ptr[J]
-    // Calculate shared memory offset for this block
-    int sharedOffset = blockIdx.x*blockDim.x*tw;
     // Iterate through entries and copy data from global memory to shared memory, assuming total_t*tw > N so that Lj_ is filled up
     for (int iter = 0; iter < tw; ++iter) {
         int globalIndex = tid*tw + iter;
         // Check if the global index is within the bounds of the row
         if (globalIndex < row_len) {
-            int sharedIndex = sharedOffset + threadIdx.x*tw + iter;
+            int sharedIndex = tid*tw + iter;
             Lj_[sharedIndex] = Lvalues[Lrow_ptr[J]+sharedIndex];
         }
     }
@@ -360,9 +358,9 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
     {
         double sumL2 = 0;
         const int global_i = globalOffset + th*tid + local_i; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
-        if (global_i < globalOffset + col_len) 
+        if (global_i < N + 1) 
         {
-            for (int k = global_i-globalOffset; k < globalOffset; k++)
+            for (int k = 0; k < globalOffset; k++)
             {
                 double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
                 double Ljk = Lj_[k];
@@ -371,36 +369,42 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
             // set Lij = (Aij - sumL2) / Dj
             // need to figure out if Aij = 0 or not
             double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
-            Lvalues[Lrow_ptr[global_i+1]-global_i] = global_i;
-        }        
+            int x = Lrow_ptr[global_i];
+            Lvalues[x+J] = (Aij - sumL2)/DJ;
+        } 
+        else if (global_i < globalOffset + col_len) // middle cols 
+        {
+            for (int k = 0; k < global_i; k++)
+            {
+                double Lik = Lvalues[k+Lrow_ptr[global_i]]; 
+                double Ljk = Lj_[k];
+                sumL2 += Lik * Ljk * D[k];
+            }
+            double Aij = get_ij(global_i, J, Avalues, Acolumns, Arow_ptr);
+            int x = Lrow_ptr[global_i];
+            Lvalues[x+J-global_i+N] = (Aij - sumL2)/DJ;
+        }
     }
 }
 
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr)
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int N)
 {
-    const double AJJ = 4;
     double sumL = 0;
 
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    for (int k = Lrow_ptr[J] + tid; k < Lrow_ptr[J+1]; ++k)
+    if (tid < Lrow_ptr[J+1] - Lrow_ptr[J])
     {
+        int k = Lrow_ptr[J] + tid;
         double Ljk = Lvalues[k];
-        sumL += Ljk * Ljk * D[Lcolumns[k]]; // sum_k Ljk^2 * Dk
+        atomicAdd(&D[J], -Ljk * Ljk * D[Lcolumns[k]]); // sum_k Ljk^2 * Dk
     }
     
-    // Perform a parallel reduction within the block
-    __shared__ double sharedSumL;
-    sharedSumL = 0;
     __syncthreads();
 
-    atomicAdd(&sharedSumL, sumL);
-
-    __syncthreads();
-
-    // Perform a parallel reduction across blocks
-    if (threadIdx.x == 0) {
-        atomicAdd(&D[J], AJJ - sharedSumL);
-        Lvalues[Lrow_ptr[J]+J] = 1; // Ljj = 1;
+    if (tid == 0) {
+        const double AJJ = 4;
+        atomicAdd(&D[J], AJJ);
+        Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
     }
 }
 
