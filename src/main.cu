@@ -26,7 +26,7 @@
 __global__ void computeOffDiagonalL(double* A_values, int* A_columns, int* A_row_ptr, double* D, double* L_values, int* L_columns, int* L_row_ptr, int n);
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int n);
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
 // __global__ void ldlt_cu();
 
 void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
@@ -124,11 +124,12 @@ int main(int argc, char const *argv[]){
     Lt.rows = m*n;
 
     const int grid_size = 1;
-    const int block_size = 4;
-    for (int J = 0; J < m*n; J++) // loop through all columns
+    const int block_size = 1;
+    for (int J = 0; J < 5; J++) // loop through all columns
     {
+        const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
-        ldlt_Dj_cu<<<grid_size,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d, n);
+        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
         {
@@ -148,7 +149,6 @@ int main(int argc, char const *argv[]){
             const int row_len = n;
             ldlt_colj_cu<<<grid_size,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
         }
-        // computeOffDiagonalL<<<grid_size,block_size>>>(J, A_values_d, A_columns_d, A_row_ptr_d, D_d, L_values_d, L_columns_d, L_row_ptr_d, n);
     }
     cudaMemcpy(d, D_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
     print_diagonal(d, m*n);
@@ -158,8 +158,8 @@ int main(int argc, char const *argv[]){
     cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    print_csr_matrix(A);
-    print_csr_matrix_info(A);
+    // print_csr_matrix(A);
+    // print_csr_matrix_info(A);
     print_csr_matrix(L);
     print_csr_matrix_info(L);
 
@@ -211,7 +211,7 @@ int main(int argc, char const *argv[]){
     std::cout << "reached the end" << std::endl;
 }
 
-__device__ double get_ij(int* row_ptr, int* columns, double *values, int i, int j) 
+__device__ double get_ij(int* row_ptr, int* columns, double *values, const int i, const int j) 
 {
     int start = row_ptr[i];
     int end = row_ptr[i + 1];
@@ -223,7 +223,7 @@ __device__ double get_ij(int* row_ptr, int* columns, double *values, int i, int 
     // Column not found, as columns are in ascending order
     return 0;
 }
-__device__ void set_ij(int* row_ptr, int* columns, double *values, int i, int j, double value) 
+__device__ void set_ij(int* row_ptr, int* columns, double *values, const int i, const int j, double value) 
 {
     int start = row_ptr[i];
     int end = row_ptr[i + 1];
@@ -250,16 +250,13 @@ __device__ void set_ij(int* row_ptr, int* columns, double *values, int i, int j,
  * @param D 
  * @return __global__ 
  */
-__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
+__global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len)
 {    
     // Assume L and Lt have zeros pre-allocated
     // const unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
     // const unsigned int total_t = blockDim.x * gridDim.x;
-    
-    // assuming total_t << N
-    // we let kth thread handle from row k*bh to (k+1)*bh
-    // the last thread will handle the middle rows
+   
     // const int col_len = N;            // total number of entries to update ;for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
     const double DJ = D[J];
 
@@ -273,9 +270,8 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
     // }
     // if (threadIdx.x == 0) {
     //     for (int i = thread_load*blockDim.x; i < row_len; i++) Lj_[i] = Lvalues[Lrow_ptr[J] + i];
-    // }
-    
-    __syncthreads();
+    // }    
+    // __syncthreads();
 
     for (int local_i = 0; local_i < col_len; local_i++)
     {
@@ -283,89 +279,68 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
         
         if (global_i < J + col_len + 1) 
         {
-            const int ith_row_len = row_len - gridDim.x * local_i - blockIdx.x;
+            int ith_row_len = row_len - gridDim.x * local_i - blockIdx.x;
+            if (J < N) ith_row_len = row_len;
+            double sumL2 = 0;
+            // double test = 114;
             for (int local_k = 0; local_k < ith_row_len; local_k++)
             {
                 const int global_k = blockDim.x * local_k + threadIdx.x;
                 if (global_k < J) {
-                    const int Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, global_k);
-                    const int Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
-                    const int Dk = D[global_k];
-                    set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, Lik * Ljk * Dk); // sum_{k=0}^{j-1} Lik * Ljk 
+                    const double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, global_k);
+                    const double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
+                    const double Dk = D[global_k];
+                    // set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, Lik * Ljk * Dk); // sum_{k=0}^{j-1} Lik * Ljk 
+                    sumL2 += Lik * Ljk * Dk;
+                    // test = Lik * Ljk * Dk;
                 }
             }
             __syncthreads();
             if (threadIdx.x == 0)
             {
                 const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
-                const double value = (Aij - get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J)) / DJ;
-                set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value); // sum_{k=0}^{j-1} Lik * Ljk 
-            }  
+                // const double sum = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J);
+                const double value = (Aij - sumL2) / DJ;
+                set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value); // sum_{k=0}^{j-1} Lik * Ljk
+                // if (J == 2) {
+                //     const double t = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 0)*D[0]* get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 0);
+                //     set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, D[1]); // sum_{k=0}^{j-1} Lik * Ljk
+                // }
+            }
         }      
     }
-
-    // for (local_i=0; local_i<th; local_i++) // loop the rows, assuming total_t*th >= col_len so that all entries Lijs are covered
-    // {
-    //     double sumL2 = 0;
-    //     const int global_i = J + th*tid + local_i + 1; // computing row global_i, whose value ranges from Lrow_ptr[global_i] to Lrow_ptr[global_i]+N+j-global_i, 
-    //     if (global_i < N + 1) 
-    //     {
-    //         int x = Lrow_ptr[global_i];
-    //         // for (int k = 0; k < J; k++)
-    //         for (int k = 0; k < J; k++) 
-    //         {
-    //             // double Lik = Lvalues[x+k]; 
-    //             // double Ljk = Lvalues[Lrow_ptr[J]+k];
-    //             double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, k);
-    //             double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, k);
-    //             sumL2 += Lik * Ljk * D[k];
-    //         }
-    //         // set Lij = (Aij - sumL2) / Dj, need to figure out if Aij = 0 or not
-    //         double Aij = 0;
-    //         for (int p = Arow_ptr[global_i]; p < Arow_ptr[global_i+1]; p++)
-    //         {
-    //             if (J == Acolumns[p]) Aij = Avalues[p];
-    //         }
-    //         Lvalues[x+J] = (Aij - sumL2) / DJ;
-    //     } 
-    //     else if (global_i < J + col_len + 1) // middle cols 
-    //     {
-    //         int x = Lrow_ptr[global_i];
-    //         // for (int k = 0; k < J-Lcolumns[x]; k++) 
-    //         for (int k = J - N; k < J; k++) 
-    //         {
-    //             // double Lik = Lvalues[x+k]; 
-    //             // double Ljk = Lvalues[Lrow_ptr[J]+k+global_i-J];
-    //             double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, k);
-    //             double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, k);
-    //             sumL2 += Lik * Ljk * D[k+global_i-J];
-    //         }
-    //         // set Lij = (Aij - sumL2) / DJ, need to figure out if Aij = 0 or not
-    //         double Aij = 0;
-    //         for (int p = Arow_ptr[global_i]; p < Arow_ptr[global_i+1]; p++)
-    //         {
-    //             if (J == Acolumns[p]) Aij = Avalues[p];
-    //         }
-    //         Lvalues[x+J-global_i+N] = (Aij - sumL2) / DJ;
-    //     }
-    // }
 }
 
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, int N)
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr)
 {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < Lrow_ptr[J+1] - Lrow_ptr[J])
-    {
-        int k = Lrow_ptr[J] + tid;
-        double Ljk = Lvalues[k];
-        atomicAdd(&D[J], -Ljk * Ljk * D[Lcolumns[k]]); // sum_k Ljk^2 * Dk
-    }
-    
-    __syncthreads();
+    const int row_len = Lrow_ptr[J+1] - Lrow_ptr[J];    
+    // load into shared
+    extern __shared__ double sdata[];
+    unsigned int tid = threadIdx.x;
+    unsigned int global_tid = blockDim.x * blockIdx.x + threadIdx.x;
 
+    const double Ljk = Lvalues[Lrow_ptr[J]+global_tid];
+    sdata[tid] = Ljk * Ljk * D[global_tid];
+
+    __syncthreads();
+    // reduction by sequential addressing
+    for (int s = blockDim.x/2; s > 0; s >>= 1)
+    {
+        if (tid < s)
+        {
+            sdata[tid] += sdata[tid + s];
+        }
+        __syncthreads();
+    }
+    // write back
     if (tid == 0) {
         const double AJJ = 4;
-        atomicAdd(&D[J], AJJ);
+        D[J] = AJJ - sdata[0];
+        // if (J == 2) {
+        //     double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 0); // 0
+        //     double Ljk1 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 1); // -0.2667
+        //     D[J] = AJJ - Ljk1*Ljk1*D[1];
+        // }
         Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
     }
 }
