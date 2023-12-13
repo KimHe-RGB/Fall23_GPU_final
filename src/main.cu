@@ -27,8 +27,8 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
 
-const int M = 5;
-const int N = 5;
+const int M = 7;
+const int N = 7;
 
 int main(int argc, char const *argv[]){
 
@@ -97,7 +97,7 @@ int main(int argc, char const *argv[]){
     L.rows = m*n;
     Lt.rows = m*n;
 
-    const int block_size = 5;
+    const int block_size = N;
     for (int J = 0; J < m*n; J++) // loop through all columns
     {
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
@@ -105,7 +105,8 @@ int main(int argc, char const *argv[]){
         // compute sumL
         // double Ajj = M_get_ij(A.row_ptr, A.columns, A.values, J, J);
         // Dj_kernel<<<1, J+1>>>(D_d, J,  L_values_d, L_columns_d, L_row_ptr_d, Ajj);
-        cudaDeviceSynchronize();
+        // cudaDeviceSynchronize();
+        
         ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
@@ -126,6 +127,7 @@ int main(int argc, char const *argv[]){
             const int row_len = n;
             ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
         }
+        cudaDeviceSynchronize();
     }
     cudaMemcpy(d, D_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
@@ -137,11 +139,11 @@ int main(int argc, char const *argv[]){
     print_diagonal(d, m*n);
     // print_csr_matrix(A);
     // print_csr_matrix_info(A);
-    print_csr_matrix(L);
+    // print_csr_matrix(L);
     // print_csr_matrix_info(L);
 
-    // Boundary Condition terms
-    double* f_d;
+    // init Boundary Condition terms
+    double* f_d; double *f;
     cudaMalloc((void **)&f_d, m*n*sizeof(double));
     int BCthread_x = 8;
     int BCthread_y = 8;
@@ -150,22 +152,27 @@ int main(int argc, char const *argv[]){
     BoundaryCondition_kernel<<<BCgrid, BCblock>>>(f_d, m, n, h);
     cudaDeviceSynchronize();
 
-    // Backward Euler steps
-    int BEthread = 64;
-    int BEblock = m*n/BEthread + 1;
-    int total_steps = 1; //endT/tau;
-    // allocate memory to store u and b on device
-    double *u_d, *b_d;
-    cudaMalloc((void **)&u_d, m*n*sizeof(double));
-    cudaMalloc((void **)&b_d, m*n*sizeof(double));
-    cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
-    for (int p = 0; p < total_steps; p++)
-    {
-        // launch kernel to compute updated b
-        Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
-        cudaDeviceSynchronize();
-        // solveAxb(L, Lt, D, b, u, MATRIX_DIM); TBA
-    }
+    // // Backward Euler Parallelized
+    // // We dont have time to finish this kernel, so we shift to compute the Backward Euler in Host
+
+    // int BEthread = 64;
+    // int BEblock = m*n/BEthread + 1;
+    // int total_steps = 1; //endT/tau;
+    // // allocate memory to store u and b on device
+    // double *u_d, *b_d;
+    // cudaMalloc((void **)&u_d, m*n*sizeof(double));
+    // cudaMalloc((void **)&b_d, m*n*sizeof(double));
+    // cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
+    // for (int p = 0; p < total_steps; p++)
+    // {
+    //     // launch kernel to compute updated b
+    //     Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
+    //     cudaDeviceSynchronize();
+    //     solveAxb_kernel(L, Lt, D, b, u, m*n); 
+    // }
+
+    double *u;
+    solveAxb(L, Lt, d, f, u, m*n);
     
     cudaFree(A_values_d);
     cudaFree(A_columns_d);
@@ -176,9 +183,9 @@ int main(int argc, char const *argv[]){
     cudaFree(Lt_values_d);
     cudaFree(Lt_columns_d);
     cudaFree(Lt_row_ptr_d);
-    cudaFree(u_d);
+    // cudaFree(u_d);
     cudaFree(f_d);
-    cudaFree(b_d);
+    // cudaFree(b_d);
     cudaError_t error = cudaGetLastError();
     if(error!=cudaSuccess)
     {
@@ -267,6 +274,7 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
         }
         __syncthreads();
     }
+    __syncthreads();
     if (threadIdx.x == 0)
     {
         const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
@@ -305,6 +313,8 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
         }
         __syncthreads();
     }
+
+    __syncthreads();
     // write back
     if (tid == 0) {
         const double AJJ = 4;

@@ -1,5 +1,34 @@
 # 2d Heat equation FD solver on GPU
 
+Usage:
+
+Sequential code:
+
+```bash
+cd src
+g++ ./main.cpp -o ./heat.out
+./heat.out
+```
+
+GPU Code:
+
+* To test with differen dimensions
+
+* blocksize and gridsizes are depended on the dimensions
+
+* To achieve good performance we expect to let $M > N$, and for performance testing, we choose $M = N$
+
+* For real world problems, we can decide to choose the shorter edge of the rectangle to be $N$
+
+```bash
+cd src
+nvcc ./main.cu -o ./heat
+./heat
+```
+
+
+## Mathematical things
+
 <!-- For the PDE:
 $$
 \begin{aligned}

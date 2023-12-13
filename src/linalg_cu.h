@@ -139,61 +139,61 @@ __global__ void initBackwardEulerMatrix_kernel(double* A_values, int* A_columns,
     }
 }
 
-/**
- * @brief cuda kernel to compute forward substitution
- */
-__global__ void forward_substitute_cu(const double* b, const CSRMatrix& L, double* x)
-{ 
-    int rows = L.rows;
+// /**
+//  * @brief cuda kernel to compute forward substitution
+//  */
+// __global__ void forward_substitute_cu(const double* b, const CSRMatrix& L, double* x)
+// { 
+//     int rows = L.rows;
 
-    // Forward substitution
-    for (int i = 0; i < rows; ++i) {
-        // Compute the sum of L(i, j) * x(j) for j = 0 to i-1
-        double sum = 0.0;
-        for (int k = L.row_ptr[i]; k < L.row_ptr[i + 1]; ++k) {
-            int j = L.columns[k];
-            sum += L.values[k] * x[j];
-        }
+//     // Forward substitution
+//     for (int i = 0; i < rows; ++i) {
+//         // Compute the sum of L(i, j) * x(j) for j = 0 to i-1
+//         double sum = 0.0;
+//         for (int k = L.row_ptr[i]; k < L.row_ptr[i + 1]; ++k) {
+//             int j = L.columns[k];
+//             sum += L.values[k] * x[j];
+//         }
 
-        // Solve for x(i)
-        x[i] = (b[i] - sum) / L.values[L.row_ptr[i + 1] - 1];
-    }
-}
+//         // Solve for x(i)
+//         x[i] = (b[i] - sum) / L.values[L.row_ptr[i + 1] - 1];
+//     }
+// }
 
-/**
- * @brief cuda kernel to compute backward substitution
- * backward substitute to solve x = b \ Lt
- */
-__global__ void backward_substitute_cu(const double* b, const CSRMatrix& U, double* x)
-{
-    int rows = U.rows;
-    // Backward substitution
-    for (int i = rows - 1; i >= 0; i--) {
-        // Compute the sum of U(i, j) * x(j) for j = i+1 to rows-1
-        double sum = 0.0;
-        for (int k = U.row_ptr[i] + 1; k < U.row_ptr[i + 1]; ++k) {
-            int j = U.columns[k];
-            sum += U.values[k] * x[j];
-        }
-        // Solve for x(i)
-        x[i] = (b[i] - sum) / U.values[U.row_ptr[i]];
-    }
-}
+// /**
+//  * @brief cuda kernel to compute backward substitution
+//  * backward substitute to solve x = b \ Lt
+//  */
+// __global__ void backward_substitute_cu(const double* b, const CSRMatrix& U, double* x)
+// {
+//     int rows = U.rows;
+//     // Backward substitution
+//     for (int i = rows - 1; i >= 0; i--) {
+//         // Compute the sum of U(i, j) * x(j) for j = i+1 to rows-1
+//         double sum = 0.0;
+//         for (int k = U.row_ptr[i] + 1; k < U.row_ptr[i + 1]; ++k) {
+//             int j = U.columns[k];
+//             sum += U.values[k] * x[j];
+//         }
+//         // Solve for x(i)
+//         x[i] = (b[i] - sum) / U.values[U.row_ptr[i]];
+//     }
+// }
 
-/**
- * @brief cuda kernel to perform an elementwise division x ./ D
- * 
- * @param D diagonal matrix D stored as a vector
- * @param x result vector
- */
-__global__ void elementwise_division_cu(double* D, double* x, int dim)
-{
+// /**
+//  * @brief cuda kernel to perform an elementwise division x ./ D
+//  * 
+//  * @param D diagonal matrix D stored as a vector
+//  * @param x result vector
+//  */
+// __global__ void elementwise_division_cu(double* D, double* x, int dim)
+// {
     
-    for (int i = 0; i < dim; i++)
-    {
-        x[i] = x[i] / D[i];
-    }
-}
+//     for (int i = 0; i < dim; i++)
+//     {
+//         x[i] = x[i] / D[i];
+//     }
+// }
 
 /**
  * @brief Pre-allocate non-zero position of L and Lt in CSR Format
@@ -331,4 +331,70 @@ __global__ void Updateb_kernel(double *b, double *u, double*f, double tinvhsq, i
     {
         b[id] = u[id] + f[id]*tinvhsq;
     }
+}
+/**
+ * @brief forward substitute to solve x = b \ L, L lower triangular in CSR format
+ * @param L Lower Triangular matrix in CSR Format
+ * @param b vector 
+ * @param x result vector
+ */
+void forward_substitute(const double* b, const CSRMatrix& L, double* x) {
+    int rows = L.rows;
+
+    // Forward substitution
+    for (int i = 0; i < rows; ++i) {
+        // Compute the sum of L(i, j) * x(j) for j = 0 to i-1
+        double sum = 0.0;
+        for (int k = L.row_ptr[i]; k < L.row_ptr[i + 1]; ++k) {
+            int j = L.columns[k];
+            sum += L.values[k] * x[j];
+        }
+
+        // Solve for x(i)
+        x[i] = (b[i] - sum) / L.values[L.row_ptr[i + 1] - 1];
+    }
+}
+
+/**
+ * @brief backward substitute to solve x = b \ Lt
+ * @param U Upper Triangular matrix in CSR Format
+ * @param b vector 
+ * @param x result vector
+ */
+void backward_substitute(const double* b, const CSRMatrix& U, double* x) {    
+    int rows = U.rows;
+    // Backward substitution
+    for (int i = rows - 1; i >= 0; i--) {
+        // Compute the sum of U(i, j) * x(j) for j = i+1 to rows-1
+        double sum = 0.0;
+        for (int k = U.row_ptr[i] + 1; k < U.row_ptr[i + 1]; ++k) {
+            int j = U.columns[k];
+            sum += U.values[k] * x[j];
+        }
+        // Solve for x(i)
+        x[i] = (b[i] - sum) / U.values[U.row_ptr[i]];
+    }
+}
+
+/**
+ * @brief perform an elementwise division x ./ D
+ * 
+ * @param D diagonal matrix D stored as a vector
+ * @param x result vector
+ */
+void elementwise_division_vector(double* D, double* x, int dim)
+{
+    for (size_t i = 0; i < dim; i++)
+    {
+        x[i] = x[i] / D[i];
+    }
+}
+
+void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, const int MATRIX_DIM)
+{
+    double *x_temp = (double *) malloc(MATRIX_DIM*sizeof(double));
+    forward_substitute(b, L, x_temp);
+    elementwise_division_vector(D, x_temp, MATRIX_DIM);
+    backward_substitute(x_temp, Lt, x);
+    free(x_temp);
 }
