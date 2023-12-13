@@ -53,6 +53,46 @@ void printArray(double *D, int dim) {
 }
 const int M = 4;
 const int N = 4;
+
+double M_get_ij(int* row_ptr, int* columns, double *values, const int i, const int j) 
+{
+    int start = row_ptr[i];
+    int end = row_ptr[i + 1];
+    for (int k = start; k < end; k++) {
+        if (columns[k] == j) {
+            return values[k];
+        }
+    }
+    // Column not found, as columns are in ascending order
+    return 0;
+}
+
+__global__ void Dj_kernel(double* D, int J, double* L_values_d, int* L_columns_d, int* L_row_ptr_d, double Ajj)
+{
+    unsigned int k = blockDim.x * blockIdx.x + threadIdx.x;
+    
+    printf("J: %d, k: %d\n", J, k);
+    if(J == 0)
+    {
+	    D[J] = Ajj;
+    }
+    else if (k < J)
+    {
+        int index;
+        double Ljk;
+        for (int i = L_row_ptr_d[J]; i < L_row_ptr_d[J+1]; i++)
+        {
+            if (L_columns_d[i] == k)
+            {
+                index = i;
+                break;
+            }
+        }
+        Ljk = L_values_d[index];
+        D[J] += Ajj/J + Ljk*Ljk*D[k];
+    }
+}
+
 int main(int argc, char const *argv[]){
 
     const int m = M;
@@ -113,6 +153,7 @@ int main(int argc, char const *argv[]){
     initLt_kernel<<<initL_grid, initL_block>>>(Lt_values_d, Lt_columns_d, Lt_row_ptr_d, m, n);
     cudaDeviceSynchronize();
 
+
     // // test init L, Lt
     cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(L.columns, L_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
@@ -129,7 +170,12 @@ int main(int argc, char const *argv[]){
     {
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
-        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
+        // compute sumL
+        double Ajj = M_get_ij(A.row_ptr, A.columns, A.values
+, J, J);
+        Dj_kernel<<<1, J+1>>>(D_d, J,  L_values_d, L_columns_d, L_row_ptr_d, Ajj);
+        cudaDeviceSynchronize();
+        // ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
         {
