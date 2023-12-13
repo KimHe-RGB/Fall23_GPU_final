@@ -25,37 +25,10 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
+__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr,
+                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len, int n);
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr);
 
-<<<<<<< HEAD
-const int M = 7;
-const int N = 7;
-=======
-void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
-    for (int i = 0; i < M*N; ++i) {
-        int valueIndex = L_row_ptr[i];
-        for (int j = 0; j < M*N; ++j) {
-            if (valueIndex < L_row_ptr[i + 1] && L_columns[valueIndex] == j) {
-                std::cout << L_values[valueIndex] << " ";
-                ++valueIndex;
-            } else {
-                std::cout << " 0 ";
-            }
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
-void printArray(double *D, int dim) {
-    for (int i = 0; i < dim; i++)
-    {
-        std::cout << D[i] << std::endl;
-    }
-    
-}
->>>>>>> a80a10d (add time count)
 
 int main(int argc, char const *argv[]){
     if (argc != 3)
@@ -68,6 +41,7 @@ int main(int argc, char const *argv[]){
     // const MATRIX_DIM = 1;
     double *u = (double *) malloc(m*n*sizeof(double));
     // loadCSV("../heat_map.csv", u, m*n);
+    double *b = (double *) malloc(m*n*sizeof(double));
     double *d = (double *) malloc(m*n*sizeof(double));
     double *temp_vec = (double *) malloc(m*n*sizeof(double));
 
@@ -101,7 +75,6 @@ int main(int argc, char const *argv[]){
     // cudaMemcpy(A.row_ptr, A_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
     // A.rows = m*n;
 
-<<<<<<< HEAD
     // malloc L and Lt in GPU
     double *L_values_d, *Lt_values_d;
     int *L_columns_d, *L_row_ptr_d, *Lt_columns_d, *Lt_row_ptr_d;
@@ -111,8 +84,6 @@ int main(int argc, char const *argv[]){
     cudaMalloc((void **)&Lt_values_d, 5*m*m*n*sizeof(double));
     cudaMalloc((void **)&Lt_columns_d, 5*m*m*n*sizeof(int));
     cudaMalloc((void **)&Lt_row_ptr_d, (m*n+1)*sizeof(int));
-=======
->>>>>>> a80a10d (add time count)
     
     // init L, LT\t
     int initL_thread = 64;
@@ -122,7 +93,6 @@ int main(int argc, char const *argv[]){
     cudaDeviceSynchronize();
     initLt_kernel<<<initL_grid, initL_block>>>(Lt_values_d, Lt_columns_d, Lt_row_ptr_d, m, n);
     cudaDeviceSynchronize();
-
 
     // // test init L, Lt
     // cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
@@ -134,42 +104,34 @@ int main(int argc, char const *argv[]){
     // L.rows = m*n;
     // Lt.rows = m*n;
 
-<<<<<<< HEAD
-    const int block_size = N;
+    printf("cholesky:\n");
+    const int block_size = n;
     for (int J = 0; J < m*n; J++) // loop through all columns
-=======
-    // cholesky decomposition
-    const int grid_size = 1;
-    const int block_size = 1;
-    for (int J = 0; J < 6; J++) // loop through all columns
->>>>>>> a80a10d (add time count)
     {
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
-        // compute sumL
-        // double Ajj = M_get_ij(A.row_ptr, A.columns, A.values, J, J);
-        // Dj_kernel<<<1, J+1>>>(D_d, J,  L_values_d, L_columns_d, L_row_ptr_d, Ajj);
-        // cudaDeviceSynchronize();
-        
-        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
+        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d, Lt_values_d, Lt_columns_d, Lt_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
         {
             const int col_len = n;
             const int row_len = J;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len); 
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, 
+                Lt_values_d, Lt_columns_d, Lt_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len, n); 
         }
         else if (J > m*n-n)
         {
             const int col_len = m*n - J;
             const int row_len = n;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, 
+                Lt_values_d, Lt_columns_d, Lt_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len, n);
         }
         else
         {
             const int col_len = n;
             const int row_len = n;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, 
+                Lt_values_d, Lt_columns_d, Lt_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len, n);
         }
         cudaDeviceSynchronize();
     }
@@ -180,14 +142,14 @@ int main(int argc, char const *argv[]){
     cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    print_diagonal(d, m*n);
+    // print_diagonal(d, m*n);
     // print_csr_matrix(A);
     // print_csr_matrix_info(A);
     // print_csr_matrix(L);
     // print_csr_matrix_info(L);
 
     // init Boundary Condition terms
-    double* f_d; double *f;
+    double* f_d;
     cudaMalloc((void **)&f_d, m*n*sizeof(double));
     int BCthread_x = 8;
     int BCthread_y = 8;
@@ -196,53 +158,32 @@ int main(int argc, char const *argv[]){
     BoundaryCondition_kernel<<<BCgrid, BCblock>>>(f_d, m, n, h);
     cudaDeviceSynchronize();
 
-<<<<<<< HEAD
-    // // Backward Euler Parallelized
-    // // We dont have time to finish this kernel, so we shift to compute the Backward Euler in Host
+    // Backward Euler Parallelized
+    // We dont have time to finish this kernel, so we shift to compute the Backward Euler in Host
 
-    // int BEthread = 64;
-    // int BEblock = m*n/BEthread + 1;
-    // int total_steps = 1; //endT/tau;
-    // // allocate memory to store u and b on device
-    // double *u_d, *b_d;
-    // cudaMalloc((void **)&u_d, m*n*sizeof(double));
-    // cudaMalloc((void **)&b_d, m*n*sizeof(double));
-    // cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
-    // for (int p = 0; p < total_steps; p++)
-    // {
-    //     // launch kernel to compute updated b
-    //     Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
-    //     cudaDeviceSynchronize();
-    //     solveAxb_kernel(L, Lt, D, b, u, m*n); 
-    // }
-
-    double *u;
-    solveAxb(L, Lt, d, f, u, m*n);
-=======
     // Backward Euler steps
     int BEthread = 64;
     int BEblock = m*n/BEthread + 1;
-    int total_steps = 1; //endT/tau;
+    int total_steps = endT/tau;
     // allocate memory to store u and b on device
     double *u_d, *b_d;
     cudaMalloc((void **)&u_d, m*n*sizeof(double));
     cudaMalloc((void **)&b_d, m*n*sizeof(double));
-    cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
     for (int p = 0; p < total_steps; p++)
     {
+        cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
         // launch kernel to compute updated b
         Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
         cudaDeviceSynchronize();
-        solveAxb(L, Lt, D, b, u, MATRIX_DIM); TBA
+        cudaMemcpy(u, u_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
+        solveAxb(L, Lt, d, b, u, m*n);
     }
->>>>>>> a80a10d (add time count)
     
-    cudaMemcpy(u, u_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
-
     // end time
+    auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
     double time_taken = duration.count();
-    printf("%lf\n", time_taken);
+    printf("time: %lf\n", time_taken);
 
 
     cudaFree(A_values_d);
@@ -254,9 +195,9 @@ int main(int argc, char const *argv[]){
     cudaFree(Lt_values_d);
     cudaFree(Lt_columns_d);
     cudaFree(Lt_row_ptr_d);
-    // cudaFree(u_d);
+    cudaFree(u_d);
     cudaFree(f_d);
-    // cudaFree(b_d);
+    cudaFree(b_d);
     cudaError_t error = cudaGetLastError();
     if(error!=cudaSuccess)
     {
@@ -307,7 +248,8 @@ __device__ void set_ij(int* row_ptr, int* columns, double *values, const int i, 
  * @return __global__ 
  */
 __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len)
+                             double *Ltvalues, int *Ltcolumns, int* Ltrow_ptr,
+                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len, int n)
 {    
     // Assume L and Lt have zeros pre-allocated
     // const int col_len = N;            // total number of entries to update ;for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
@@ -321,7 +263,7 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
     // gridDim.x = col_len; j + col_length is bottom non-0 element's global row index
     const int global_i = J + 1 + blockIdx.x; 
     int ith_row_len = row_len - 1 - blockIdx.x;
-    if (J < N) ith_row_len = row_len;
+    if (J < n) ith_row_len = row_len;
 
     for (int local_k = threadIdx.x; local_k < ith_row_len; local_k+=blockDim.x)
     {
@@ -351,6 +293,7 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
         const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
         const double value2 = (Aij - suml2[0]) / DJ;
         set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value2); // sum_{k=0}^{j-1} Lik * Ljk
+        set_ij(Ltrow_ptr, Ltcolumns, Ltvalues, J, global_i, value2);
         // if (J == M*N-3) {
         //     double x = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 12);
         //     double x2 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 12); const double xx = x*x2*D[12];
@@ -364,7 +307,8 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
     } 
 }
 
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr)
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr,
+                                            double *Ltvalues, int *Ltcolumns, int* Ltrow_ptr)
 {
     // load into shared
     extern __shared__ double sdata[];
@@ -391,5 +335,6 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
         const double AJJ = 4;
         D[J] = AJJ - sdata[0];
         Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
+        Ltvalues[Ltrow_ptr[J+1]-1] = 1; //Ltjj = 1; 
     }
 }
