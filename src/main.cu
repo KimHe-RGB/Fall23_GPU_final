@@ -171,11 +171,10 @@ int main(int argc, char const *argv[]){
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
         // compute sumL
-        double Ajj = M_get_ij(A.row_ptr, A.columns, A.values
-, J, J);
-        Dj_kernel<<<1, J+1>>>(D_d, J,  L_values_d, L_columns_d, L_row_ptr_d, Ajj);
+        // double Ajj = M_get_ij(A.row_ptr, A.columns, A.values, J, J);
+        // Dj_kernel<<<1, J+1>>>(D_d, J,  L_values_d, L_columns_d, L_row_ptr_d, Ajj);
         cudaDeviceSynchronize();
-        // ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
+        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
         {

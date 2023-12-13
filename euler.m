@@ -1,5 +1,5 @@
-m = 20;
-n = 20;
+m = 4;
+n = 4;
 
 h = 0.1;
 tau = 0.01;
@@ -11,7 +11,7 @@ for i = 1:m
     % center block
     for j = 1:n
         index = (i-1)*n+j;
-        A(index, index) = 1+4*th;
+        A(index, index) = 4*th;
         if j > 1
             A(index, index-1) = -th;
         end
@@ -37,6 +37,10 @@ for i = 1:m
     end
 end
 
+[L, D] = ldl(A);
+diag(D)
+L
+%%
 % init
 u = zeros(m*n, 1);
 % backward euler
