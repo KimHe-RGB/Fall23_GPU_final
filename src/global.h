@@ -3,7 +3,7 @@
 const double h = 0.01;
 const double invhsq = 1/h/h;
 const double tau = 0.01; // timestep size ht
-const double endT = 1; // end time
+const double endT = 0.1; // end time
 
 #define a(x) 3
 #define b(y) 3
