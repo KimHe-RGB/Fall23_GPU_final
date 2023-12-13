@@ -13,8 +13,10 @@
 #include <time.h>
 #include <cuda.h>
 #include <iostream>
+#include <chrono>
 #include "debug_printing.h"
 #include "linalg_cu.h"
+#include "linalg.h"
 
 #ifndef __GLOBAL_H
 #include "global.h"
@@ -27,13 +29,42 @@ __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_pt
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
 
+<<<<<<< HEAD
 const int M = 7;
 const int N = 7;
+=======
+void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
+    for (int i = 0; i < M*N; ++i) {
+        int valueIndex = L_row_ptr[i];
+        for (int j = 0; j < M*N; ++j) {
+            if (valueIndex < L_row_ptr[i + 1] && L_columns[valueIndex] == j) {
+                std::cout << L_values[valueIndex] << " ";
+                ++valueIndex;
+            } else {
+                std::cout << " 0 ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+void printArray(double *D, int dim) {
+    for (int i = 0; i < dim; i++)
+    {
+        std::cout << D[i] << std::endl;
+    }
+    
+}
+>>>>>>> a80a10d (add time count)
 
 int main(int argc, char const *argv[]){
+    if (argc != 3)
+    {
+        printf("heat_cuda m n\n");
+    }
 
-    const int m = M;
-    const int n = N; 
+    const int m = (int) atoi(argv[1]);;
+    const int n = (int) atoi(argv[2]);; 
     // const MATRIX_DIM = 1;
     double *u = (double *) malloc(m*n*sizeof(double));
     // loadCSV("../heat_map.csv", u, m*n);
@@ -44,6 +75,9 @@ int main(int argc, char const *argv[]){
     CSRMatrix A = CSRMatrix(m*n, 5*m*n);
     CSRMatrix L = CSRMatrix(m*n, 5*m*m*n); // store the L matrix
     CSRMatrix Lt = CSRMatrix(m*n, 5*m*m*n); // store the L matrix's transpose
+
+    // start time 
+    auto start = std::chrono::high_resolution_clock::now();
 
     // malloc CSR Matrix A in GPU
     double* A_values_d;
@@ -62,11 +96,12 @@ int main(int argc, char const *argv[]){
     cudaDeviceSynchronize();
     
     // test init A
-    cudaMemcpy(A.values, A_values_d, 5*m*n*sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(A.columns, A_columns_d, 5*m*n*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(A.row_ptr, A_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    A.rows = m*n;
+    // cudaMemcpy(A.values, A_values_d, 5*m*n*sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(A.columns, A_columns_d, 5*m*n*sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(A.row_ptr, A_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
+    // A.rows = m*n;
 
+<<<<<<< HEAD
     // malloc L and Lt in GPU
     double *L_values_d, *Lt_values_d;
     int *L_columns_d, *L_row_ptr_d, *Lt_columns_d, *Lt_row_ptr_d;
@@ -76,6 +111,8 @@ int main(int argc, char const *argv[]){
     cudaMalloc((void **)&Lt_values_d, 5*m*m*n*sizeof(double));
     cudaMalloc((void **)&Lt_columns_d, 5*m*m*n*sizeof(int));
     cudaMalloc((void **)&Lt_row_ptr_d, (m*n+1)*sizeof(int));
+=======
+>>>>>>> a80a10d (add time count)
     
     // init L, LT\t
     int initL_thread = 64;
@@ -88,17 +125,24 @@ int main(int argc, char const *argv[]){
 
 
     // // test init L, Lt
-    cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(L.columns, L_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(L.row_ptr, L_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    L.rows = m*n;
-    Lt.rows = m*n;
+    // cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(L.columns, L_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(L.row_ptr, L_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
+    // L.rows = m*n;
+    // Lt.rows = m*n;
 
+<<<<<<< HEAD
     const int block_size = N;
     for (int J = 0; J < m*n; J++) // loop through all columns
+=======
+    // cholesky decomposition
+    const int grid_size = 1;
+    const int block_size = 1;
+    for (int J = 0; J < 6; J++) // loop through all columns
+>>>>>>> a80a10d (add time count)
     {
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
@@ -152,6 +196,7 @@ int main(int argc, char const *argv[]){
     BoundaryCondition_kernel<<<BCgrid, BCblock>>>(f_d, m, n, h);
     cudaDeviceSynchronize();
 
+<<<<<<< HEAD
     // // Backward Euler Parallelized
     // // We dont have time to finish this kernel, so we shift to compute the Backward Euler in Host
 
@@ -173,7 +218,33 @@ int main(int argc, char const *argv[]){
 
     double *u;
     solveAxb(L, Lt, d, f, u, m*n);
+=======
+    // Backward Euler steps
+    int BEthread = 64;
+    int BEblock = m*n/BEthread + 1;
+    int total_steps = 1; //endT/tau;
+    // allocate memory to store u and b on device
+    double *u_d, *b_d;
+    cudaMalloc((void **)&u_d, m*n*sizeof(double));
+    cudaMalloc((void **)&b_d, m*n*sizeof(double));
+    cudaMemcpy(u_d, u, m*n*sizeof(double), cudaMemcpyHostToDevice);
+    for (int p = 0; p < total_steps; p++)
+    {
+        // launch kernel to compute updated b
+        Updateb_kernel<<<BEblock, BEthread>>>(b_d, u_d, f_d, tau*invhsq, m*n);
+        cudaDeviceSynchronize();
+        solveAxb(L, Lt, D, b, u, MATRIX_DIM); TBA
+    }
+>>>>>>> a80a10d (add time count)
     
+    cudaMemcpy(u, u_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
+
+    // end time
+    std::chrono::duration<double> duration = end - start;
+    double time_taken = duration.count();
+    printf("%lf\n", time_taken);
+
+
     cudaFree(A_values_d);
     cudaFree(A_columns_d);
     cudaFree(A_row_ptr_d);
