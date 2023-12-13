@@ -39,7 +39,7 @@ try
     [L, D] = ldl(A);
     diag(D)
     L
-    spy(L)
+    
     % nnz(L)/matrix_size ~ O(1/n)
     disp('Matrix is symmetric positive definite.')
 catch ME

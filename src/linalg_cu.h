@@ -248,6 +248,7 @@ __global__ void initL_kernel(double* L_values, int* L_columns, int* L_row_ptr, i
         }
     }
 }
+
 __global__ void initLt_kernel(double* Lt_values, int* Lt_columns, int* Lt_row_ptr, int m, int n)
 {
     // Initialize Lt matrix 

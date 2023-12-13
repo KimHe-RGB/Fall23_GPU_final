@@ -23,75 +23,12 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-__global__ void computeOffDiagonalL(double* A_values, int* A_columns, int* A_row_ptr, double* D, double* L_values, int* L_columns, int* L_row_ptr, int n);
 __global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
-// __global__ void ldlt_cu();
 
-void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
-    for (int i = 0; i < M*N; ++i) {
-        int valueIndex = L_row_ptr[i];
-        for (int j = 0; j < M*N; ++j) {
-            if (valueIndex < L_row_ptr[i + 1] && L_columns[valueIndex] == j) {
-                std::cout << L_values[valueIndex] << " ";
-                ++valueIndex;
-            } else {
-                std::cout << " 0 ";
-            }
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
-void printArray(double *D, int dim) {
-    for (int i = 0; i < dim; i++)
-    {
-        std::cout << D[i] << std::endl;
-    }
-    
-}
-const int M = 4;
-const int N = 4;
-
-double M_get_ij(int* row_ptr, int* columns, double *values, const int i, const int j) 
-{
-    int start = row_ptr[i];
-    int end = row_ptr[i + 1];
-    for (int k = start; k < end; k++) {
-        if (columns[k] == j) {
-            return values[k];
-        }
-    }
-    // Column not found, as columns are in ascending order
-    return 0;
-}
-
-__global__ void Dj_kernel(double* D, int J, double* L_values_d, int* L_columns_d, int* L_row_ptr_d, double Ajj)
-{
-    unsigned int k = blockDim.x * blockIdx.x + threadIdx.x;
-    
-    printf("J: %d, k: %d\n", J, k);
-    if(J == 0)
-    {
-	    D[J] = Ajj;
-    }
-    else if (k < J)
-    {
-        int index;
-        double Ljk;
-        for (int i = L_row_ptr_d[J]; i < L_row_ptr_d[J+1]; i++)
-        {
-            if (L_columns_d[i] == k)
-            {
-                index = i;
-                break;
-            }
-        }
-        Ljk = L_values_d[index];
-        D[J] += Ajj/J + Ljk*Ljk*D[k];
-    }
-}
+const int M = 5;
+const int N = 5;
 
 int main(int argc, char const *argv[]){
 
@@ -109,9 +46,6 @@ int main(int argc, char const *argv[]){
     CSRMatrix Lt = CSRMatrix(m*n, 5*m*m*n); // store the L matrix's transpose
 
     // malloc CSR Matrix A in GPU
-    // A_values_d
-    // A_columns_d
-    // A_row_ptr_d
     double* A_values_d;
     int *A_columns_d, *A_row_ptr_d;
     double *D_d;
@@ -134,8 +68,6 @@ int main(int argc, char const *argv[]){
     A.rows = m*n;
 
     // malloc L and Lt in GPU
-    // L_values_d, L_columns_d, L_row_ptr
-    // Lt_values_d, Lt_columns_d, Lt_row_ptr
     double *L_values_d, *Lt_values_d;
     int *L_columns_d, *L_row_ptr_d, *Lt_columns_d, *Lt_row_ptr_d;
     cudaMalloc((void **)&L_values_d, 5*m*m*n*sizeof(double));
@@ -144,6 +76,7 @@ int main(int argc, char const *argv[]){
     cudaMalloc((void **)&Lt_values_d, 5*m*m*n*sizeof(double));
     cudaMalloc((void **)&Lt_columns_d, 5*m*m*n*sizeof(int));
     cudaMalloc((void **)&Lt_row_ptr_d, (m*n+1)*sizeof(int));
+    
     // init L, LT\t
     int initL_thread = 64;
     dim3 initL_grid(m*n/initL_thread+1, 1, 1);
@@ -164,9 +97,8 @@ int main(int argc, char const *argv[]){
     L.rows = m*n;
     Lt.rows = m*n;
 
-    const int grid_size = 1;
-    const int block_size = 1;
-    for (int J = 0; J < 6; J++) // loop through all columns
+    const int block_size = 5;
+    for (int J = 0; J < m*n; J++) // loop through all columns
     {
         const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
         // kernel update Djj
@@ -196,17 +128,17 @@ int main(int argc, char const *argv[]){
         }
     }
     cudaMemcpy(d, D_d, m*n*sizeof(double), cudaMemcpyDeviceToHost);
-    print_diagonal(d, m*n);
     cudaMemcpy(L.values, L_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(L.columns, L_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(L.row_ptr, L_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
+    print_diagonal(d, m*n);
     // print_csr_matrix(A);
     // print_csr_matrix_info(A);
     print_csr_matrix(L);
-    print_csr_matrix_info(L);
+    // print_csr_matrix_info(L);
 
     // Boundary Condition terms
     double* f_d;
@@ -253,7 +185,6 @@ int main(int argc, char const *argv[]){
         fprintf(stderr,"ERROR: %s\n", cudaGetErrorString(error) );
         exit(-1);
     }
-    std::cout << "reached the end" << std::endl;
 }
 
 __device__ double get_ij(int* row_ptr, int* columns, double *values, const int i, const int j) 
@@ -282,6 +213,8 @@ __device__ void set_ij(int* row_ptr, int* columns, double *values, const int i, 
     return;
 }
 
+#define get_ij_direct(row_ptr, columns, values, i, j) values[row_ptr[i] + j];
+
 /**
  * @brief 
  * 
@@ -299,30 +232,19 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
                              double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len)
 {    
     // Assume L and Lt have zeros pre-allocated
-    // const unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    // const unsigned int total_t = blockDim.x * gridDim.x;
-   
     // const int col_len = N;            // total number of entries to update ;for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
     const double DJ = D[J];
 
     // load shared memory
-    // extern __shared__ double Lj_[];
-    // const int thread_load = row_len/blockDim.x; 
-
-    // for (int i = 0; i < thread_load; i++)
-    // {
-    //     Lj_[threadIdx.x*thread_load + i] = Lvalues[Lrow_ptr[J] + threadIdx.x*thread_load + i];
-    // }
-    // if (threadIdx.x == 0) {
-    //     for (int i = thread_load*blockDim.x; i < row_len; i++) Lj_[i] = Lvalues[Lrow_ptr[J] + i];
-    // }    
-    // __syncthreads();
-
-    const int global_i = J + 1 + blockIdx.x; // griddim.x = col_len; j + col_length is bottom non-0 element's global row index
+    extern __shared__ double suml2[];
+    suml2[threadIdx.x] = 0;
+    __syncthreads();
+    
+    // gridDim.x = col_len; j + col_length is bottom non-0 element's global row index
+    const int global_i = J + 1 + blockIdx.x; 
     int ith_row_len = row_len - 1 - blockIdx.x;
     if (J < N) ith_row_len = row_len;
-    double sumL2 = 0;
-    double foo = 123;
+
     for (int local_k = threadIdx.x; local_k < ith_row_len; local_k+=blockDim.x)
     {
         const int global_k = global_i - col_len + local_k;
@@ -330,21 +252,35 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
         if (global_k >= 0 && global_k < J) {
             const double Lik = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, global_k);
             const double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
+            // const double Ljk = get_ij_direct(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
             const double Dk = D[global_k];
-            // set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, Lik * Ljk * Dk); // sum_{k=0}^{j-1} Lik * Ljk 
-            sumL2 += Lik * Ljk * Dk;
+            suml2[threadIdx.x] += Lik * Ljk * Dk;
         }
     }
     __syncthreads();
+    // reduction by sequential addressing
+    for (int s = blockDim.x/2; s > 0; s >>= 1)
+    {
+        if (threadIdx.x < s)
+        {
+            suml2[threadIdx.x] += suml2[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
     if (threadIdx.x == 0)
     {
         const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
-        // const double sum = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J);
-        const double value = (Aij - sumL2) / DJ;
-        set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value); // sum_{k=0}^{j-1} Lik * Ljk
-        // if (J >= 1) {
-        //     // const double t = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 0)*D[0]* get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 0);
-        //     set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, global_i); // sum_{k=0}^{j-1} Lik * Ljk
+        const double value2 = (Aij - suml2[0]) / DJ;
+        set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value2); // sum_{k=0}^{j-1} Lik * Ljk
+        // if (J == M*N-3) {
+        //     double x = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 12);
+        //     double x2 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 12); const double xx = x*x2*D[12];
+        //     double y = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 11);
+        //     double y2 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 11);const double yy = y*y2*D[11];
+        //     double z = get_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, 10);
+        //     double z2 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 10);const double zz = z*z2*D[10];
+        //     double v = (Aij - xx - yy - zz) / DJ;
+        //     set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, 114); // sum_{k=0}^{j-1} Lik * Ljk
         // }
     } 
 }
@@ -354,10 +290,10 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
     // load into shared
     extern __shared__ double sdata[];
     unsigned int tid = threadIdx.x;
-    unsigned int global_tid = blockDim.x * blockIdx.x + threadIdx.x;
+    unsigned int global_k = Lcolumns[Lrow_ptr[J]] + threadIdx.x;
 
-    const double Ljk = Lvalues[Lrow_ptr[J]+global_tid];
-    sdata[tid] = Ljk * Ljk * D[global_tid];
+    const double Ljk = Lvalues[Lrow_ptr[J]+tid];
+    sdata[tid] = Ljk * Ljk * D[global_k];
 
     __syncthreads();
     // reduction by sequential addressing
@@ -373,11 +309,6 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
     if (tid == 0) {
         const double AJJ = 4;
         D[J] = AJJ - sdata[0];
-        // if (J == 2) {
-        //     double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 0); // 0
-        //     double Ljk1 = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, 1); // -0.2667
-        //     D[J] = AJJ - Ljk1*Ljk1*D[1];
-        // }
         Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
     }
 }

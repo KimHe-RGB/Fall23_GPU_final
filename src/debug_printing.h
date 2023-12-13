@@ -18,10 +18,10 @@ void print_csr_matrix(const CSRMatrix& A) {
         int valueIndex = A.row_ptr[i];
         for (int j = 0; j < rows; ++j) {
             if (valueIndex < A.row_ptr[i + 1] && A.columns[valueIndex] == j) {
-                std::cout << std::setprecision(4) << " " << A.values[valueIndex] << " ";
+                std::cout << std::setprecision(5) << " " << A.values[valueIndex] << " ";
                 ++valueIndex;
             } else {
-                std::cout << " / ";
+                std::cout << " 0 ";
             }
         }
         std::cout << std::endl;
@@ -91,6 +91,46 @@ void print_heat_map(double* heat, int m, int n) {
         std::cout << std::endl;
     }
     std::cout << std::endl;
+}
+
+
+/**
+ * @brief print out CSR from Arrays
+ * 
+ * @param L_values 
+ * @param L_columns 
+ * @param L_row_ptr 
+ * @param M 
+ * @param N 
+ */
+void printCSR(double* L_values, int* L_columns, int* L_row_ptr, int M, int N){
+    for (int i = 0; i < M*N; ++i) {
+        int valueIndex = L_row_ptr[i];
+        for (int j = 0; j < M*N; ++j) {
+            if (valueIndex < L_row_ptr[i + 1] && L_columns[valueIndex] == j) {
+                std::cout << L_values[valueIndex] << " ";
+                ++valueIndex;
+            } else {
+                std::cout << " 0 ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+/**
+ * @brief Print out the Array 
+ * 
+ * @param D 
+ * @param dim 
+ */
+void printArray(double *D, int dim) {
+    for (int i = 0; i < dim; i++)
+    {
+        std::cout << D[i] << std::endl;
+    }
+    
 }
 
 #endif
