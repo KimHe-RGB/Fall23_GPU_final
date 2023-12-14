@@ -1,7 +1,7 @@
-m = 100;
-n = 100;
+m = 4;
+n = 4;
 
-h = 0.1;
+h = 0.01;
 tau = 0.01;
 
 % A: left side matrix 
@@ -11,7 +11,7 @@ for i = 1:m
     % center block
     for j = 1:n
         index = (i-1)*n+j;
-        A(index, index) = 4*th;
+        A(index, index) = 1+4*th;
         if j > 1
             A(index, index-1) = -th;
         end

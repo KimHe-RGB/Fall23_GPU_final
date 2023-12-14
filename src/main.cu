@@ -117,8 +117,8 @@ int main(int argc, char const *argv[]){
 
     for (int J = 0; J < m*n; J++) // loop through all columns
     {
-        const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
-        ldlt_Dj_cu<<<1,row_len>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
+        // const int row_len = L.row_ptr[J+1] - L.row_ptr[J]; 
+        ldlt_Dj_cu<<<1,block_size>>>(D_d, J, L_values_d, L_columns_d, L_row_ptr_d);
         // kernel update Lij for all i > j
         if (J < n)
         {
@@ -166,7 +166,7 @@ int main(int argc, char const *argv[]){
     cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
     // print_csr_matrix_info(L);
     // print_csr_matrix(L);
-    // print_diagonal(d, m*n);
+    print_diagonal(d, m*n);
 
     // init Boundary Condition terms
     double* f_d;
@@ -321,16 +321,19 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
 __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr)
 {
     // load into shared
-    extern __shared__ double sdata[];
-    unsigned int tid = threadIdx.x;
-    unsigned int global_k = Lcolumns[Lrow_ptr[J]] + threadIdx.x;
+    __shared__ double sdata[block_size];
+    unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    const double Ljk = Lvalues[Lrow_ptr[J]+tid];
-    sdata[tid] = Ljk * Ljk * D[global_k];
-
+    for (int local_k = 0; local_k < J; local_k+=blockDim.x)
+    {
+        unsigned int global_k = Lcolumns[Lrow_ptr[J]] + local_k * blockDim.x +threadIdx.x;
+        // const double Ljk = Lvalues[Lrow_ptr[J]+local_k];
+        double Ljk = get_ij(Lrow_ptr, Lcolumns, Lvalues, J, global_k);
+        sdata[tid] += Ljk * Ljk * D[global_k];
+    }
     __syncthreads();
     // reduction by sequential addressing
-    for (int s = blockDim.x/2; s > 0; s >>= 1)
+    for (int s = block_size/2; s > 0; s >>= 1)
     {
         if (tid < s)
         {
@@ -338,8 +341,6 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
         }
         __syncthreads();
     }
-
-    __syncthreads();
     // write back
     if (tid == 0) {
         const double AJJ = 1 + 4 * invhsq_dev * tau_dev;
