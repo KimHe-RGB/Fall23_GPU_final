@@ -13,8 +13,10 @@
 #include <time.h>
 #include <cuda.h>
 #include <iostream>
+#include <chrono>
 #include "debug_printing.h"
 #include "linalg_cu.h"
+#include "linalg.h"
 
 #ifndef __GLOBAL_H
 #include "global.h"
@@ -23,9 +25,9 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len);
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr);
+__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr,
+                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len, int n);
+__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr);
 
 const int M = 4;
 const int N = 4;
