@@ -33,9 +33,17 @@ const int block_size = 10;
 
 int main(int argc, char const *argv[]){
 
-    const int m = M;
-    const int n = N; 
+    if (argc != 3)
+    {
+        printf("heat_cuda m n\n");
+    }
+
+    const int m = (int) atoi(argv[1]);;
+    const int n = (int) atoi(argv[2]);; 
+    // const MATRIX_DIM = 1;
     double *u = (double *) malloc(m*n*sizeof(double));
+    // loadCSV("../heat_map.csv", u, m*n);
+    double *b = (double *) malloc(m*n*sizeof(double));
     double *d = (double *) malloc(m*n*sizeof(double));
     double *temp_vec = (double *) malloc(m*n*sizeof(double));
 
@@ -43,6 +51,9 @@ int main(int argc, char const *argv[]){
     CSRMatrix A = CSRMatrix(m*n, 5*m*n);
     CSRMatrix L = CSRMatrix(m*n, 5*m*m*n); // store the L matrix
     CSRMatrix Lt = CSRMatrix(m*n, 5*m*m*n); // store the L matrix's transpose
+
+    // start time 
+    auto start = std::chrono::high_resolution_clock::now();
 
     // malloc CSR Matrix A in GPU
     double* A_values_d;
