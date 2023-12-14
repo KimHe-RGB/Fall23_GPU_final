@@ -366,7 +366,6 @@ void initBackwardEulerCSRMatrix(CSRMatrix& A, double htinvhsq, int m, int n) {
 void Backward_Euler_CSR(double *u, const int m, const int n)
 {
     // u_{k+1} = (I + ht*invhsq*A) \ (u_k + ht*invhsq*f);
-    double t = 0.0;
     const int MATRIX_DIM = m*n;
 
     double *f = (double *) malloc(MATRIX_DIM*MATRIX_DIM*sizeof(double));

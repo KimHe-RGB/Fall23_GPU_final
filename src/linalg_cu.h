@@ -15,10 +15,8 @@ __global__ void initBackwardEulerMatrix_kernel(double* A_values, int* A_columns,
     int j = (blockIdx.y * blockDim.y) + threadIdx.y;
     int row = i*n+j;
     int count = 0;
-    // double center = 1+4.0*htinvhsq; 
-    // double other = -htinvhsq;
-    double center = 4.0; 
-    double other = -1;
+    double center = 1+4.0*htinvhsq; 
+    double other = -htinvhsq;
     if (i == 0) // first block
     {
         count = 0;
@@ -331,70 +329,4 @@ __global__ void Updateb_kernel(double *b, double *u, double*f, double tinvhsq, i
     {
         b[id] = u[id] + f[id]*tinvhsq;
     }
-}
-/**
- * @brief forward substitute to solve x = b \ L, L lower triangular in CSR format
- * @param L Lower Triangular matrix in CSR Format
- * @param b vector 
- * @param x result vector
- */
-void forward_substitute(const double* b, const CSRMatrix& L, double* x) {
-    int rows = L.rows;
-
-    // Forward substitution
-    for (int i = 0; i < rows; ++i) {
-        // Compute the sum of L(i, j) * x(j) for j = 0 to i-1
-        double sum = 0.0;
-        for (int k = L.row_ptr[i]; k < L.row_ptr[i + 1]; ++k) {
-            int j = L.columns[k];
-            sum += L.values[k] * x[j];
-        }
-
-        // Solve for x(i)
-        x[i] = (b[i] - sum) / L.values[L.row_ptr[i + 1] - 1];
-    }
-}
-
-/**
- * @brief backward substitute to solve x = b \ Lt
- * @param U Upper Triangular matrix in CSR Format
- * @param b vector 
- * @param x result vector
- */
-void backward_substitute(const double* b, const CSRMatrix& U, double* x) {    
-    int rows = U.rows;
-    // Backward substitution
-    for (int i = rows - 1; i >= 0; i--) {
-        // Compute the sum of U(i, j) * x(j) for j = i+1 to rows-1
-        double sum = 0.0;
-        for (int k = U.row_ptr[i] + 1; k < U.row_ptr[i + 1]; ++k) {
-            int j = U.columns[k];
-            sum += U.values[k] * x[j];
-        }
-        // Solve for x(i)
-        x[i] = (b[i] - sum) / U.values[U.row_ptr[i]];
-    }
-}
-
-/**
- * @brief perform an elementwise division x ./ D
- * 
- * @param D diagonal matrix D stored as a vector
- * @param x result vector
- */
-void elementwise_division_vector(double* D, double* x, int dim)
-{
-    for (size_t i = 0; i < dim; i++)
-    {
-        x[i] = x[i] / D[i];
-    }
-}
-
-void solveAxb(CSRMatrix &L, CSRMatrix &Lt, double *D, double *b, double *x, const int MATRIX_DIM)
-{
-    double *x_temp = (double *) malloc(MATRIX_DIM*sizeof(double));
-    forward_substitute(b, L, x_temp);
-    elementwise_division_vector(D, x_temp, MATRIX_DIM);
-    backward_substitute(x_temp, Lt, x);
-    free(x_temp);
 }

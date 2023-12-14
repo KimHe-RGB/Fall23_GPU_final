@@ -9,6 +9,8 @@
  * @copyright Copyright (c) 2023
  * 
  */
+#define __IN_CUDA
+
 #include <stdio.h>
 #include <time.h>
 #include <cuda.h>
@@ -25,12 +27,13 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr,
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len, int n);
-__global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr);
+__global__ void ldlt_colj_cu(int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
+                            double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr,
+                            double *Avalues, int *Acolumns, int *Arow_ptr, 
+                            double* D, const int col_len, const int row_len, int n);
+__global__ void ldlt_Dj_cu(double* D, int J, 
+                            double *Lvalues, int *Lcolumns, int *Lrow_ptr);
 
-const int M = 4;
-const int N = 4;
 const int block_size = 10;
 
 int main(int argc, char const *argv[]){
@@ -38,6 +41,7 @@ int main(int argc, char const *argv[]){
     if (argc != 3)
     {
         printf("heat_cuda m n\n");
+        exit(-1);
     }
 
     const int m = (int) atoi(argv[1]);;
@@ -73,6 +77,8 @@ int main(int argc, char const *argv[]){
     dim3 initA_block(initA_thread_x, initA_thread_y, 1);
     initBackwardEulerMatrix_kernel<<<initA_grid, initA_block>>>(A_values_d, A_columns_d, A_row_ptr_d, tau*invhsq, m, n);
     cudaDeviceSynchronize();
+    // print_csr_matrix_info(A);
+    // print_csr_matrix(A);
     
     // test init A
     cudaMemcpy(A.values, A_values_d, 5*m*n*sizeof(double), cudaMemcpyDeviceToHost);
@@ -118,24 +124,35 @@ int main(int argc, char const *argv[]){
         {
             const int col_len = n;
             const int row_len = J;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len); 
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d,
+            L_values_d, Lt_columns_d, Lt_row_ptr_d,  
+            A_values_d, A_columns_d, A_row_ptr_d, 
+            D_d, col_len, row_len, n); 
         }
         else if (J > m*n-n)
         {
             const int col_len = m*n - J;
             const int row_len = n;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, 
+            Lt_values_d, Lt_columns_d, Lt_row_ptr_d,  
+            A_values_d, A_columns_d, A_row_ptr_d,
+            D_d, col_len, row_len, n);
         }
         else
         {
             const int col_len = n;
             const int row_len = n;
-            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, A_values_d, A_columns_d, A_row_ptr_d, D_d, col_len, row_len);
+            ldlt_colj_cu<<<col_len,block_size>>>(J, L_values_d, L_columns_d, L_row_ptr_d, 
+            Lt_values_d, Lt_columns_d, Lt_row_ptr_d, 
+            A_values_d, A_columns_d, A_row_ptr_d,
+            D_d, col_len, row_len, n);
         }
         cudaError_t error = cudaGetLastError();
         if(error!=cudaSuccess)
         {
-            fprintf(stderr,"ERROR After Updating Below Diagonal: Message: %s\nColumn: %d", cudaGetErrorString(error), J);
+            fprintf(stderr,
+            "ERROR After Updating Below Diagonal:\n Message: %s\nColumn: %d", 
+            cudaGetErrorString(error), J);
             exit(-1);
         }
         cudaDeviceSynchronize();
@@ -147,10 +164,9 @@ int main(int argc, char const *argv[]){
     cudaMemcpy(Lt.values, Lt_values_d, 5*m*m*n*sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.columns, Lt_columns_d, 5*m*m*n*sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(Lt.row_ptr, Lt_row_ptr_d, (m*n+1)*sizeof(int), cudaMemcpyDeviceToHost);
-    // print_csr_matrix(A);
-    // print_csr_matrix_info(A);
-    // print_csr_matrix(L);
     // print_csr_matrix_info(L);
+    // print_csr_matrix(L);
+    // print_diagonal(d, m*n);
 
     // init Boundary Condition terms
     double* f_d;
@@ -209,7 +225,6 @@ int main(int argc, char const *argv[]){
         fprintf(stderr,"ERROR: %s\n", cudaGetErrorString(error_exit) );
         exit(-1);
     } else {
-        // print_diagonal(d, m*n);
         printf("SUCCESS\n");
     }
 }
@@ -257,7 +272,9 @@ __device__ void set_ij(int* row_ptr, int* columns, double *values, const int i, 
  * @param D 
  */
 __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *Lrow_ptr, 
-                             double *Avalues, int *Acolumns, int *Arow_ptr, double* D, const int col_len, const int row_len)
+                             double *Ltvalues, int *Ltcolumns, int *Ltrow_ptr, 
+                             double *Avalues, int *Acolumns, int *Arow_ptr, 
+                            double* D, const int col_len, const int row_len, const int n)
 {    
     // Assume L and Lt have zeros pre-allocated
     // const int col_len = N;            // total number of entries to update ;for starting & interior cols, col length = N; but for J>M*N-N it is (M*N-J) 
@@ -271,7 +288,7 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
     // gridDim.x = col_len; j + col_length is bottom non-0 element's global row index
     const int global_i = J + 1 + blockIdx.x; 
     int ith_row_len = row_len - 1 - blockIdx.x;
-    if (J < N) ith_row_len = row_len;
+    if (J < n) ith_row_len = row_len;
 
     for (int local_k = threadIdx.x; local_k < ith_row_len; local_k+=blockDim.x)
     {
@@ -291,12 +308,13 @@ __global__ void ldlt_colj_cu(const int J, double *Lvalues, int *Lcolumns, int *L
             suml2[threadIdx.x] += suml2[threadIdx.x + s];
         __syncthreads();
     }
-    __syncthreads();
+    // assign
     if (threadIdx.x == 0)
     {
         const double Aij = get_ij(Arow_ptr, Acolumns, Avalues, global_i, J);
         const double value2 = (Aij - suml2[0]) / DJ;
         set_ij(Lrow_ptr, Lcolumns, Lvalues, global_i, J, value2); 
+        set_ij(Ltrow_ptr, Ltcolumns, Ltvalues, J, global_i, value2); 
     } 
 }
 
@@ -324,7 +342,7 @@ __global__ void ldlt_Dj_cu(double* D, int J, double *Lvalues, int *Lcolumns, int
     __syncthreads();
     // write back
     if (tid == 0) {
-        const double AJJ = 4;
+        const double AJJ = 1 + 4 * invhsq_dev * tau_dev;
         D[J] = AJJ - sdata[0];
         Lvalues[Lrow_ptr[J+1]-1] = 1; // Ljj = 1;
     }

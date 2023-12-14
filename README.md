@@ -7,7 +7,7 @@ Sequential code:
 ```bash
 cd src
 g++ ./main.cpp -o ./heat.out
-./heat.out
+./heat.out <m> <n>
 ```
 
 GPU Code:
